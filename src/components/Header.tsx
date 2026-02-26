@@ -1,58 +1,100 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, Sun, Moon, LogOut } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { TrendingUp, Sun, Moon, LogOut, PlusCircle, History, Menu, X } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Badge } from '@/components/ui/badge';
+import { useState } from 'react';
+import { cn } from '@/lib/utils';
+
+const navItems = [
+  { label: 'Nova Análise', path: '/dashboard', icon: PlusCircle },
+  { label: 'Histórico', path: '/history', icon: History },
+];
 
 export default function Header() {
   const { signOut, user } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
-
-  const menuItems = [
-    { label: 'Estruturas salvas', path: '/history' },
-    { label: 'Montagem', path: '/dashboard' },
-    { label: 'Cores', path: '/' },
-    { label: 'Configurações', path: '/auth' },
-  ];
+  const location = useLocation();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 border-b bg-card/80 backdrop-blur-md">
+    <header className="sticky top-0 z-50 border-b border-border/60 bg-card/80 backdrop-blur-md">
       <div className="container flex h-14 items-center justify-between">
-        <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 font-bold text-lg">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+        {/* Logo */}
+        <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 font-bold text-lg shrink-0">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary shadow-[0_0_16px_-4px_hsl(var(--primary)/0.5)]">
             <TrendingUp className="h-4 w-4 text-primary-foreground" />
           </div>
-          OpçõesX
+          <span className="hidden sm:inline tracking-tight">OpçõesX</span>
+          <Badge variant="outline" className="text-[8px] border-primary/30 text-primary hidden sm:inline-flex">PRO</Badge>
         </button>
 
-        {user && (
-          <nav className="hidden md:flex items-center gap-1">
-            {menuItems.map((item) => (
-              <Button
+        {/* Desktop Nav */}
+        <nav className="hidden md:flex items-center gap-1">
+          {navItems.map(item => {
+            const isActive = location.pathname === item.path;
+            return (
+              <button
                 key={item.path}
-                variant="ghost"
-                size="sm"
                 onClick={() => navigate(item.path)}
-                className="text-xs"
+                className={cn(
+                  'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                  isActive
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                )}
               >
+                <item.icon className="h-4 w-4" />
                 {item.label}
-              </Button>
-            ))}
-          </nav>
-        )}
+              </button>
+            );
+          })}
+        </nav>
 
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Alternar tema">
+        {/* Right actions */}
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Alternar tema" className="h-9 w-9">
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
           {user && (
-            <Button variant="ghost" size="icon" onClick={signOut} aria-label="Sair">
+            <Button variant="ghost" size="icon" onClick={signOut} aria-label="Sair" className="h-9 w-9">
               <LogOut className="h-4 w-4" />
             </Button>
           )}
+          {/* Mobile menu toggle */}
+          <Button variant="ghost" size="icon" className="h-9 w-9 md:hidden" onClick={() => setMobileOpen(!mobileOpen)}>
+            {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+          </Button>
         </div>
       </div>
+
+      {/* Mobile Nav */}
+      {mobileOpen && (
+        <div className="md:hidden border-t border-border/40 bg-card/95 backdrop-blur-md animate-fade-in">
+          <nav className="container py-2 space-y-1">
+            {navItems.map(item => {
+              const isActive = location.pathname === item.path;
+              return (
+                <button
+                  key={item.path}
+                  onClick={() => { navigate(item.path); setMobileOpen(false); }}
+                  className={cn(
+                    'flex items-center gap-3 w-full px-4 py-3 rounded-lg text-sm font-medium transition-all',
+                    isActive
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {item.label}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+      )}
     </header>
   );
 }

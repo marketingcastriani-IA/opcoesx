@@ -10,10 +10,10 @@ export default function Header() {
   const navigate = useNavigate();
 
   const menuItems = [
-    { label: 'Estruturas salvas', path: '/estruturas' },
-    { label: 'Montagem', path: '/montagem' },
-    { label: 'Cores', path: '/cores' },
-    { label: 'Configurações', path: '/configuracoes' },
+    { label: 'Estruturas salvas', path: '/history' },
+    { label: 'Montagem', path: '/dashboard' },
+    { label: 'Cores', path: '/' },
+    { label: 'Configurações', path: '/auth' },
   ];
 
   return (

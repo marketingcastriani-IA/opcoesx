@@ -18,8 +18,10 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Save, Sparkles, Loader2 } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Save, Sparkles, Loader2, Upload, PenLine, ArrowRight, Camera, Keyboard } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+type InputMode = null | 'manual' | 'image';
 
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
@@ -31,11 +33,11 @@ export default function Dashboard() {
   const [aiSuggestion, setAiSuggestion] = useState('');
   const [loadingAI, setLoadingAI] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [inputMode, setInputMode] = useState<InputMode>(null);
 
   const metrics = useMemo(() => calculateMetrics(legs), [legs]);
   const payoffData = useMemo(() => generatePayoffCurve(legs), [legs]);
 
-  // Auto-infer expiry from option tickers
   const inferredExpiry = useMemo(() => {
     const leg = legs.find(l => l.option_type !== 'stock');
     return leg ? getExpiryFromTicker(leg.asset) : null;
@@ -48,7 +50,6 @@ export default function Dashboard() {
     }
   }, [inferredExpiry]);
 
-  // CDI return for invested capital
   const investedCapital = useMemo(() => {
     if (metrics.montageTotal) return Math.abs(metrics.montageTotal);
     return Math.max(Math.abs(metrics.netCost || 0), 1);
@@ -151,9 +152,10 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-16">
       <Header />
       <main className="container py-6 space-y-6 animate-fade-in">
+        {/* Page title */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
@@ -172,44 +174,117 @@ export default function Dashboard() {
             <p className="text-sm text-muted-foreground">Monte sua estrutura de opções e analise os riscos</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={getAISuggestion} disabled={loadingAI || legs.length === 0}>
+            <Button variant="outline" onClick={getAISuggestion} disabled={loadingAI || legs.length === 0} size="sm">
               {loadingAI ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
               Sugestão IA
             </Button>
-            <Button onClick={saveAnalysis} disabled={saving || legs.length === 0}>
+            <Button onClick={saveAnalysis} disabled={saving || legs.length === 0} size="sm">
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Salvar
             </Button>
           </div>
         </div>
 
+        {/* Analysis name */}
         <div className="space-y-2">
           <Label>Nome da análise</Label>
           <Input value={analysisName} onChange={e => setAnalysisName(e.target.value)} placeholder="Ex: Trava de alta PETR4" className="max-w-md" />
         </div>
 
-        <Tabs defaultValue="manual" className="w-full">
-          <TabsList>
-            <TabsTrigger value="manual">Entrada Manual</TabsTrigger>
-            <TabsTrigger value="image">Upload de Imagem</TabsTrigger>
-          </TabsList>
-          <TabsContent value="manual" className="space-y-4 mt-4">
-            <Card>
-              <CardHeader><CardTitle className="text-base">Adicionar Perna</CardTitle></CardHeader>
-              <CardContent><LegForm onAdd={addLeg} /></CardContent>
-            </Card>
-          </TabsContent>
-          <TabsContent value="image" className="mt-4">
-            <ImageUpload onLegsExtracted={handleLegsFromImage} />
-          </TabsContent>
-        </Tabs>
+        {/* Input Mode Selector - Big beautiful cards */}
+        {inputMode === null ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* OCR Upload Card */}
+            <button
+              onClick={() => setInputMode('image')}
+              className="group relative overflow-hidden rounded-2xl border-2 border-dashed border-primary/30 bg-gradient-to-br from-primary/5 via-card to-card p-8 text-left transition-all duration-300 hover:border-primary/60 hover:shadow-[0_0_50px_-12px_hsl(var(--primary)/0.3)] hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -translate-y-8 translate-x-8 group-hover:bg-primary/10 transition-colors" />
+              <div className="relative space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors">
+                    <Camera className="h-7 w-7" />
+                  </div>
+                  <div>
+                    <Badge variant="outline" className="text-[9px] border-primary/40 text-primary mb-1">IA + OCR</Badge>
+                    <h3 className="text-xl font-bold">Upload de Imagem</h3>
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Tire um <strong className="text-foreground">print da sua corretora</strong> (BTG, Profit, Clear) e a IA extrai automaticamente todas as pernas da operação.
+                </p>
+                <div className="flex items-center gap-2 text-primary text-sm font-medium">
+                  Começar com imagem <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            </button>
+
+            {/* Manual Entry Card */}
+            <button
+              onClick={() => setInputMode('manual')}
+              className="group relative overflow-hidden rounded-2xl border-2 border-dashed border-border/60 bg-gradient-to-br from-muted/30 via-card to-card p-8 text-left transition-all duration-300 hover:border-primary/40 hover:shadow-[0_0_50px_-12px_hsl(var(--primary)/0.2)] hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-muted/30 rounded-full blur-3xl -translate-y-8 translate-x-8 group-hover:bg-primary/5 transition-colors" />
+              <div className="relative space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/60 text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                    <Keyboard className="h-7 w-7" />
+                  </div>
+                  <div>
+                    <Badge variant="outline" className="text-[9px] border-border/60 text-muted-foreground mb-1">PRECISO</Badge>
+                    <h3 className="text-xl font-bold">Entrada Manual</h3>
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Insira manualmente cada perna: <strong className="text-foreground">ativo, strike, prêmio, quantidade</strong>. Controle total sobre cada detalhe.
+                </p>
+                <div className="flex items-center gap-2 text-muted-foreground group-hover:text-primary text-sm font-medium transition-colors">
+                  Inserir manualmente <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                </div>
+              </div>
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Mode toggle tabs */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setInputMode('manual')}
+                className={cn(
+                  'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                  inputMode === 'manual' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                )}
+              >
+                <Keyboard className="h-4 w-4" /> Manual
+              </button>
+              <button
+                onClick={() => setInputMode('image')}
+                className={cn(
+                  'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                  inputMode === 'image' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                )}
+              >
+                <Camera className="h-4 w-4" /> Upload OCR
+              </button>
+            </div>
+
+            {inputMode === 'manual' ? (
+              <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
+                <CardHeader><CardTitle className="text-base">Adicionar Perna</CardTitle></CardHeader>
+                <CardContent><LegForm onAdd={addLeg} /></CardContent>
+              </Card>
+            ) : (
+              <ImageUpload onLegsExtracted={handleLegsFromImage} />
+            )}
+          </div>
+        )}
 
         <LegsTable legs={legs} onRemove={removeLeg} onUpdate={updateLeg} />
 
         {legs.length > 0 && (
           <>
             <MetricsCards metrics={metrics} cdiReturn={cdiReturn} daysToExpiry={daysToExpiry} />
-            <Card>
+            <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
               <CardHeader><CardTitle className="text-base">Gráfico de Payoff</CardTitle></CardHeader>
               <CardContent>
                 <PayoffChart
@@ -224,7 +299,7 @@ export default function Dashboard() {
             </Card>
             <CDIComparison metrics={metrics} cdiRate={cdiRate} setCdiRate={setCdiRate} daysToExpiry={daysToExpiry} setDaysToExpiry={setDaysToExpiry} />
             {aiSuggestion && (
-              <Card className="border-primary/30">
+              <Card className="border-primary/30 bg-card/50 backdrop-blur-sm">
                 <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
                     <Sparkles className="h-4 w-4 text-primary" />

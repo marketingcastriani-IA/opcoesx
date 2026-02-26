@@ -91,14 +91,14 @@ export default function ImageUpload({ onLegsExtracted }: ImageUploadProps) {
 
   return (
     <Card
-      className="border-dashed border-2 transition-colors hover:border-primary/50 cursor-pointer"
+      className="relative border-2 border-dashed bg-card/60 transition-all hover:border-primary/50 hover:shadow-[0_0_40px_-12px_hsl(var(--primary)/0.35)] cursor-pointer"
       onPaste={handlePaste}
       onDrop={handleDrop}
       onDragOver={e => e.preventDefault()}
       onClick={() => !loading && fileInputRef.current?.click()}
       tabIndex={0}
     >
-      <CardContent className="flex flex-col items-center justify-center py-8 gap-3">
+      <CardContent className="flex flex-col items-center justify-center py-10 gap-3">
         <input
           ref={fileInputRef}
           type="file"
@@ -106,6 +106,7 @@ export default function ImageUpload({ onLegsExtracted }: ImageUploadProps) {
           className="hidden"
           onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])}
         />
+        <div className="text-xs font-semibold uppercase tracking-wide text-primary">Upload OCR (Destaque)</div>
         {loading ? (
           <>
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -144,4 +145,3 @@ export default function ImageUpload({ onLegsExtracted }: ImageUploadProps) {
     </Card>
   );
 }
-

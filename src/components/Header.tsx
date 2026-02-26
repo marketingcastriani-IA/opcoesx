@@ -9,6 +9,13 @@ export default function Header() {
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
+  const menuItems = [
+    { label: 'Estruturas salvas', path: '/estruturas' },
+    { label: 'Montagem', path: '/montagem' },
+    { label: 'Cores', path: '/cores' },
+    { label: 'Configurações', path: '/configuracoes' },
+  ];
+
   return (
     <header className="sticky top-0 z-50 border-b bg-card/80 backdrop-blur-md">
       <div className="container flex h-14 items-center justify-between">
@@ -18,6 +25,23 @@ export default function Header() {
           </div>
           OpçõesX
         </button>
+
+        {user && (
+          <nav className="hidden md:flex items-center gap-1">
+            {menuItems.map((item) => (
+              <Button
+                key={item.path}
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate(item.path)}
+                className="text-xs"
+              >
+                {item.label}
+              </Button>
+            ))}
+          </nav>
+        )}
+
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Alternar tema">
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}

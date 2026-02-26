@@ -10,6 +10,8 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import History from "./pages/History";
 import AnalysisDetail from "./pages/AnalysisDetail";
+import AdminLogin from "./pages/AdminLogin";
+import AdminPanel from "./pages/AdminPanel";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +30,8 @@ const App = () => (
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/history" element={<History />} />
               <Route path="/analysis/:id" element={<AnalysisDetail />} />
+              <Route path="/admin-login" element={<AdminLogin />} />
+              <Route path="/admin" element={<AdminPanel />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

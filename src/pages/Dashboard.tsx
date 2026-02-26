@@ -1,6 +1,8 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate, useNavigate } from 'react-router-dom';
+import { useAccessControl } from '@/hooks/useAccessControl';
+import AccessBlocked from '@/pages/AccessBlocked';
 import Header from '@/components/Header';
 import LegForm from '@/components/LegForm';
 import LegsTable from '@/components/LegsTable';
@@ -18,13 +20,14 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Save, Sparkles, Loader2, Upload, PenLine, ArrowRight, Camera, Keyboard } from 'lucide-react';
+import { Save, Sparkles, Loader2, ArrowRight, Camera, Keyboard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type InputMode = null | 'manual' | 'image';
 
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
+  const access = useAccessControl();
   const navigate = useNavigate();
   const [legs, setLegs] = useState<Leg[]>([]);
   const [analysisName, setAnalysisName] = useState('');
@@ -60,84 +63,52 @@ export default function Dashboard() {
     return calculateCDIOpportunityCost(investedCapital, cdiRate, daysToExpiry);
   }, [investedCapital, cdiRate, daysToExpiry]);
 
-  const addLeg = useCallback((leg: Leg) => {
-    setLegs(prev => [...prev, leg]);
-  }, []);
+  const addLeg = useCallback((leg: Leg) => { setLegs(prev => [...prev, leg]); }, []);
+  const removeLeg = useCallback((index: number) => { setLegs(prev => prev.filter((_, i) => i !== index)); }, []);
+  const updateLeg = useCallback((index: number, leg: Leg) => { setLegs(prev => prev.map((item, i) => (i === index ? leg : item))); }, []);
+  const handleLegsFromImage = useCallback((extractedLegs: Leg[]) => { setLegs(prev => [...prev, ...extractedLegs]); }, []);
 
-  const removeLeg = useCallback((index: number) => {
-    setLegs(prev => prev.filter((_, i) => i !== index));
-  }, []);
-
-  const updateLeg = useCallback((index: number, leg: Leg) => {
-    setLegs(prev => prev.map((item, i) => (i === index ? leg : item)));
-  }, []);
-
-  const handleLegsFromImage = useCallback((extractedLegs: Leg[]) => {
-    setLegs(prev => [...prev, ...extractedLegs]);
-  }, []);
-
-  if (authLoading) return null;
+  if (authLoading || access.status === 'loading') return null;
   if (!user) return <Navigate to="/auth" replace />;
 
+  // Access gate
+  if (access.status === 'pending' || access.status === 'rejected' || access.status === 'expired') {
+    return <AccessBlocked status={access.status} />;
+  }
+
   const getAISuggestion = async () => {
-    if (legs.length === 0) {
-      toast.error('Adicione pelo menos uma perna para obter sugestão.');
-      return;
-    }
+    if (legs.length === 0) { toast.error('Adicione pelo menos uma perna.'); return; }
     setLoadingAI(true);
     try {
       const { data, error } = await supabase.functions.invoke('analyze-structure', {
         body: {
           legs,
-          metrics: {
-            ...metrics,
-            cdiReturn,
-            cdiEfficiency: cdiReturn > 0 && typeof metrics.maxGain === 'number'
-              ? Math.round((metrics.maxGain / cdiReturn) * 100)
-              : null,
-          },
-          cdiRate,
-          daysToExpiry,
+          metrics: { ...metrics, cdiReturn, cdiEfficiency: cdiReturn > 0 && typeof metrics.maxGain === 'number' ? Math.round((metrics.maxGain / cdiReturn) * 100) : null },
+          cdiRate, daysToExpiry,
         },
       });
       if (error) throw error;
       setAiSuggestion(data.suggestion || 'Sem sugestão disponível.');
     } catch (err: any) {
       toast.error('Erro ao obter sugestão: ' + (err.message || 'Tente novamente'));
-    } finally {
-      setLoadingAI(false);
-    }
+    } finally { setLoadingAI(false); }
   };
 
   const saveAnalysis = async () => {
-    if (legs.length === 0) {
-      toast.error('Adicione pelo menos uma perna.');
-      return;
-    }
+    if (legs.length === 0) { toast.error('Adicione pelo menos uma perna.'); return; }
     setSaving(true);
     try {
       const { data: analysis, error: aError } = await supabase
-        .from('analyses')
-        .insert({
-          user_id: user.id,
-          name: analysisName || 'Análise sem nome',
-          underlying_asset: legs[0]?.asset || null,
-          cdi_rate: cdiRate || null,
-          days_to_expiry: daysToExpiry || null,
-          ai_suggestion: aiSuggestion || null,
-        })
-        .select()
-        .single();
+        .from('analyses').insert({
+          user_id: user.id, name: analysisName || 'Análise sem nome',
+          underlying_asset: legs[0]?.asset || null, cdi_rate: cdiRate || null,
+          days_to_expiry: daysToExpiry || null, ai_suggestion: aiSuggestion || null,
+        }).select().single();
       if (aError) throw aError;
 
       const legsToInsert = legs.map(l => ({
-        analysis_id: analysis.id,
-        side: l.side,
-        option_type: l.option_type,
-        asset: l.asset,
-        strike: l.strike,
-        price: l.price,
-        quantity: l.quantity,
+        analysis_id: analysis.id, side: l.side, option_type: l.option_type,
+        asset: l.asset, strike: l.strike, price: l.price, quantity: l.quantity,
       }));
       const { error: lError } = await supabase.from('legs').insert(legsToInsert);
       if (lError) throw lError;
@@ -146,29 +117,35 @@ export default function Dashboard() {
       navigate(`/analysis/${analysis.id}`);
     } catch (err: any) {
       toast.error('Erro ao salvar: ' + (err.message || 'Tente novamente'));
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
   return (
     <div className="min-h-screen bg-background pb-16">
       <Header />
       <main className="container py-6 space-y-6 animate-fade-in">
+        {/* Access banner */}
+        {access.daysRemaining !== null && access.daysRemaining <= 7 && (
+          <div className="rounded-lg border border-warning/40 bg-warning/5 px-4 py-3 flex items-center gap-3">
+            <Badge className="bg-warning text-warning-foreground text-[10px] shrink-0">TRIAL</Badge>
+            <p className="text-sm text-warning">
+              {access.daysRemaining === 0
+                ? 'Seu período de acesso expira hoje!'
+                : `Seu acesso expira em ${access.daysRemaining} dia(s).`}
+            </p>
+          </div>
+        )}
+
         {/* Page title */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold">Nova Análise</h1>
               {metrics.strategyLabel && (
-                <Badge variant="outline" className="border-primary/40 text-primary">
-                  {metrics.strategyLabel}
-                </Badge>
+                <Badge variant="outline" className="border-primary/40 text-primary">{metrics.strategyLabel}</Badge>
               )}
               {metrics.isRiskFree && (
-                <Badge className="bg-success text-success-foreground text-[10px]">
-                  RISCO ZERO
-                </Badge>
+                <Badge className="bg-success text-success-foreground text-[10px]">RISCO ZERO</Badge>
               )}
             </div>
             <p className="text-sm text-muted-foreground">Monte sua estrutura de opções e analise os riscos</p>
@@ -191,10 +168,9 @@ export default function Dashboard() {
           <Input value={analysisName} onChange={e => setAnalysisName(e.target.value)} placeholder="Ex: Trava de alta PETR4" className="max-w-md" />
         </div>
 
-        {/* Input Mode Selector - Big beautiful cards */}
+        {/* Input Mode Selector */}
         {inputMode === null ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* OCR Upload Card */}
             <button
               onClick={() => setInputMode('image')}
               className="group relative overflow-hidden rounded-2xl border-2 border-dashed border-primary/30 bg-gradient-to-br from-primary/5 via-card to-card p-8 text-left transition-all duration-300 hover:border-primary/60 hover:shadow-[0_0_50px_-12px_hsl(var(--primary)/0.3)] hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
@@ -211,7 +187,7 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Tire um <strong className="text-foreground">print da sua corretora</strong> (BTG, Profit, Clear) e a IA extrai automaticamente todas as pernas da operação.
+                  Tire um <strong className="text-foreground">print da sua corretora</strong> (BTG, Profit, Clear) e a IA extrai automaticamente todas as pernas.
                 </p>
                 <div className="flex items-center gap-2 text-primary text-sm font-medium">
                   Começar com imagem <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
@@ -219,7 +195,6 @@ export default function Dashboard() {
               </div>
             </button>
 
-            {/* Manual Entry Card */}
             <button
               onClick={() => setInputMode('manual')}
               className="group relative overflow-hidden rounded-2xl border-2 border-dashed border-border/60 bg-gradient-to-br from-muted/30 via-card to-card p-8 text-left transition-all duration-300 hover:border-primary/40 hover:shadow-[0_0_50px_-12px_hsl(var(--primary)/0.2)] hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
@@ -236,7 +211,7 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Insira manualmente cada perna: <strong className="text-foreground">ativo, strike, prêmio, quantidade</strong>. Controle total sobre cada detalhe.
+                  Insira manualmente cada perna: <strong className="text-foreground">ativo, strike, prêmio, quantidade</strong>. Controle total.
                 </p>
                 <div className="flex items-center gap-2 text-muted-foreground group-hover:text-primary text-sm font-medium transition-colors">
                   Inserir manualmente <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
@@ -246,28 +221,14 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="space-y-4">
-            {/* Mode toggle tabs */}
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setInputMode('manual')}
-                className={cn(
-                  'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
-                  inputMode === 'manual' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                )}
-              >
+              <button onClick={() => setInputMode('manual')} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all', inputMode === 'manual' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50')}>
                 <Keyboard className="h-4 w-4" /> Manual
               </button>
-              <button
-                onClick={() => setInputMode('image')}
-                className={cn(
-                  'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
-                  inputMode === 'image' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-                )}
-              >
+              <button onClick={() => setInputMode('image')} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all', inputMode === 'image' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50')}>
                 <Camera className="h-4 w-4" /> Upload OCR
               </button>
             </div>
-
             {inputMode === 'manual' ? (
               <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
                 <CardHeader><CardTitle className="text-base">Adicionar Perna</CardTitle></CardHeader>
@@ -287,28 +248,16 @@ export default function Dashboard() {
             <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
               <CardHeader><CardTitle className="text-base">Gráfico de Payoff</CardTitle></CardHeader>
               <CardContent>
-                <PayoffChart
-                  data={payoffData}
-                  breakevens={metrics.realBreakeven ? [metrics.realBreakeven] : metrics.breakevens}
-                  cdiRate={cdiRate}
-                  daysToExpiry={daysToExpiry}
-                  netCost={metrics.netCost}
-                  montageTotal={metrics.montageTotal}
-                />
+                <PayoffChart data={payoffData} breakevens={metrics.realBreakeven ? [metrics.realBreakeven] : metrics.breakevens} cdiRate={cdiRate} daysToExpiry={daysToExpiry} netCost={metrics.netCost} montageTotal={metrics.montageTotal} />
               </CardContent>
             </Card>
             <CDIComparison metrics={metrics} cdiRate={cdiRate} setCdiRate={setCdiRate} daysToExpiry={daysToExpiry} setDaysToExpiry={setDaysToExpiry} />
             {aiSuggestion && (
               <Card className="border-primary/30 bg-card/50 backdrop-blur-sm">
                 <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    Sugestão da IA
-                  </CardTitle>
+                  <CardTitle className="text-base flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Sugestão da IA</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-sm whitespace-pre-wrap">{aiSuggestion}</p>
-                </CardContent>
+                <CardContent><p className="text-sm whitespace-pre-wrap">{aiSuggestion}</p></CardContent>
               </Card>
             )}
           </>

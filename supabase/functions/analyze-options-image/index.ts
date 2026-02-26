@@ -30,13 +30,16 @@ const normalizeLegs = (legs: RawLeg[] | undefined) => {
   return legs
     .map((leg) => {
       const side = leg.side === "buy" || leg.side === "sell" ? leg.side : null;
-      const optionType = leg.option_type === "call" || leg.option_type === "put" ? leg.option_type : null;
+      const optionType = leg.option_type === "call" || leg.option_type === "put" || leg.option_type === "stock"
+        ? leg.option_type : null;
       const asset = typeof leg.asset === "string" ? leg.asset.trim().toUpperCase() : "";
       const strike = toNumber(leg.strike);
       const price = toNumber(leg.price);
       const quantity = Math.max(1, Math.round(toNumber(leg.quantity) || 1));
 
-      if (!side || !optionType || !asset || strike <= 0 || price <= 0) return null;
+      if (!side || !optionType || !asset || strike <= 0) return null;
+      // For stock legs, price can be 0 (it's the spot purchase, strike = purchase price)
+      if (optionType !== "stock" && price <= 0) return null;
 
       return {
         side,
@@ -81,13 +84,26 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content:
-              "Você é especialista em leitura de screenshots de plataformas brasileiras de opções. Extraia apenas as pernas válidas da grade de ordens. Ignore botões, menus e resumo lateral. Regras: side=buy para Compra/C, side=sell para Venda/V; option_type=call/put; asset em maiúsculas; strike e price como número decimal; quantity inteiro >=1. Se não tiver certeza, descarte a perna duvidosa.",
+            content: `Você é especialista em leitura de screenshots de plataformas brasileiras de opções (Clear, XP, BTG, Rico, Inter, etc).
+
+OBJETIVO: Extrair TODAS as pernas da grade de ordens/book de ofertas. NÃO invente pernas. NÃO omita pernas.
+
+REGRAS CRÍTICAS:
+1. side: "buy" para Compra/C/+, "sell" para Venda/V/-
+2. option_type: "call" para Call/C, "put" para Put/P, "stock" para ativo-objeto (quando o campo Call/Put mostra "-", "Ação", está vazio ou é o próprio ticker base como PETR4)
+3. asset: ticker em maiúsculas (ex: PETR4, VALE3, PETRD325, etc)
+4. strike: preço de exercício como número decimal. Para pernas "stock", use o preço unitário de compra/venda do ativo
+5. price: prêmio da opção como número decimal. Para pernas "stock", use 0
+6. quantity: quantidade inteira >= 1
+
+DUPLA VERIFICAÇÃO: Conte quantas linhas a tabela da imagem possui. O número de pernas extraídas DEVE ser igual ao número de linhas. Se faltar alguma, revise.
+
+ATENÇÃO ESPECIAL: Linhas sem indicação Call/Put (campo vazio, "-" ou mostrando o ativo base) são pernas de ATIVO-OBJETO (stock). NÃO as descarte.`,
           },
           {
             role: "user",
             content: [
-              { type: "text", text: "Extraia as pernas da operação desta imagem. Priorize as linhas da tabela com colunas Lado, Call/Put, Ativo, Strike, Preço e Qtd." },
+              { type: "text", text: "Extraia TODAS as pernas da operação desta imagem. Cada linha da tabela é uma perna. Não omita nenhuma." },
               { type: "image_url", image_url: { url: resolvedImage } },
             ],
           },
@@ -97,7 +113,7 @@ serve(async (req) => {
             type: "function",
             function: {
               name: "extract_legs",
-              description: "Extrai pernas de opções da imagem",
+              description: "Extrai todas as pernas de opções/ações da imagem",
               parameters: {
                 type: "object",
                 properties: {
@@ -107,7 +123,7 @@ serve(async (req) => {
                       type: "object",
                       properties: {
                         side: { type: "string", enum: ["buy", "sell"] },
-                        option_type: { type: "string", enum: ["call", "put"] },
+                        option_type: { type: "string", enum: ["call", "put", "stock"] },
                         asset: { type: "string" },
                         strike: { type: "number" },
                         price: { type: "number" },
@@ -117,8 +133,12 @@ serve(async (req) => {
                       additionalProperties: false,
                     },
                   },
+                  total_rows_in_image: {
+                    type: "number",
+                    description: "Número total de linhas/pernas visíveis na tabela da imagem para dupla verificação",
+                  },
                 },
-                required: ["legs"],
+                required: ["legs", "total_rows_in_image"],
                 additionalProperties: false,
               },
             },
@@ -131,14 +151,12 @@ serve(async (req) => {
     if (!response.ok) {
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limit exceeded. Try again later." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (response.status === 402) {
         return new Response(JSON.stringify({ error: "Payment required." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const t = await response.text();
@@ -150,6 +168,8 @@ serve(async (req) => {
     const toolCallArgs = result.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
     const parsedTool = toolCallArgs ? JSON.parse(toolCallArgs) : null;
 
+    console.log("Extracted legs count:", parsedTool?.legs?.length, "Image rows:", parsedTool?.total_rows_in_image);
+
     const normalized = normalizeLegs(parsedTool?.legs);
 
     return new Response(JSON.stringify({ legs: normalized }), {
@@ -158,9 +178,7 @@ serve(async (req) => {
   } catch (e) {
     console.error("analyze-options-image error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
-

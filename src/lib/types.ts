@@ -1,7 +1,7 @@
 export interface Leg {
   id?: string;
   side: 'buy' | 'sell';
-  option_type: 'call' | 'put';
+  option_type: 'call' | 'put' | 'stock';
   asset: string;
   strike: number;
   price: number;

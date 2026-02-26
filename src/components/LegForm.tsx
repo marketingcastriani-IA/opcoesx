@@ -41,11 +41,12 @@ export default function LegForm({ onAdd }: LegFormProps) {
       </div>
       <div className="space-y-1">
         <Label className="text-xs">Tipo</Label>
-        <Select value={leg.option_type} onValueChange={v => setLeg(p => ({ ...p, option_type: v as 'call' | 'put' }))}>
+        <Select value={leg.option_type} onValueChange={v => setLeg(p => ({ ...p, option_type: v as 'call' | 'put' | 'stock' }))}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="call">Call</SelectItem>
             <SelectItem value="put">Put</SelectItem>
+            <SelectItem value="stock">Ativo</SelectItem>
           </SelectContent>
         </Select>
       </div>

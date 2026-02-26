@@ -1,158 +1,162 @@
-# Melhorias no OpçõesX: OCR, Payoff com CDI e UX
 
-## Problemas identificados
+# Refatoracao Institucional Completa do OpcoesX
 
-1. **OCR faltando perna**: A primeira linha da imagem (Compra PETR4 a 39,55) nao tem Call/Put (e o campo "-"), e o OCR descarta porque exige `option_type`. Essa e uma perna de ativo-objeto (compra/venda do ativo diretamente), que precisa ser tratada como tipo especial.
-2. **Sem botao X para limpar imagem**: Nao tem como remover a imagem carregada e trocar por outra sem clicar de novo.
-3. **Grafico de payoff sem linha CDI**: Falta a linha laranja do CDI para comparacao visual.
-4. **CDI base padrao**: Deveria comecar com 14,90% e nao 0.
-5. **Destaque da diferenca vs CDI**: Falta mostrar em destaque o % acima/abaixo do CDI.
+## Resumo
+
+Transformar o app em ferramenta de nivel profissional com: OCR preciso para BTG/Profit, motor de calendario B3 2026, calculo de Collar com custo real de montagem, comparativo CDI como custo de oportunidade, e grafico de payoff com 3 zonas de cor (vermelho/laranja/verde).
 
 ---
 
-## Plano de implementacao
+## 1. Novo modulo: `src/lib/b3-calendar.ts`
 
-&nbsp;
+Centralizar toda logica de calendario e identificacao de tickers:
 
-## 📅 Regra de Vencimento de Opções (B3)
-
-Para calcular a data correta, o sistema deve cruzar o **mês/tipo** (identificado pela letra no código da opção) com o calendário vigente.
-
-### 1. Tabela de Identificação por Letras
-
-O código da opção (ticker) possui uma letra que indica o mês e se é uma **Call** (Compra) ou **Put** (Venda).
-
-
-|           |          |         |
-| --------- | -------- | ------- |
-| **Mês**   | **Call** | **Put** |
-| Janeiro   | **A**    | **M**   |
-| Fevereiro | **B**    | **N**   |
-| Março     | **C**    | **O**   |
-| Abril     | **D**    | **P**   |
-| Maio      | **E**    | **Q**   |
-| Junho     | **F**    | **R**   |
-| Julho     | **G**    | **S**   |
-| Agosto    | **H**    | **T**   |
-| Setembro  | **I**    | **U**   |
-| Outubro   | **J**    | **V**   |
-| Novembro  | **K**    | **W**   |
-| Dezembro  | **L**    | **X**   |
-
+- **Tabela de letras B3**: A-L (Calls Jan-Dez), M-X (Puts Jan-Dez)
+- **Vencimentos 2026 hardcoded**: 16/01, 20/02, 20/03, 17/04, 15/05, 19/06, 17/07, 21/08, 18/09, 16/10, 19/11, 18/12
+- **Feriados bancarios 2026**: para calculo de dias uteis
+- **`getExpiryFromTicker(ticker)`**: extrai 5a letra, retorna data de vencimento e tipo (call/put)
+- **`countBusinessDays(from, to)`**: calcula dias uteis excluindo fins de semana e feriados
+- **`getOptionTypeFromLetter(letter)`**: retorna "call" ou "put" baseado na letra
+- Remover duplicacao dessas funcoes do Dashboard.tsx e CDIComparison.tsx
 
 ---
 
-### 2. Lógica do Cálculo (Algoritmo)
+## 2. Novo modulo: `src/lib/strategies.ts`
 
-Para o seu app retornar a data exata, ele deve seguir este fluxo:
+Auto-deteccao de estrategias:
 
-1. **Identificar o Mês:** Leia a 5ª letra do ticker (Ex: PETR**E**123 -> Letra E = Maio).
-2. **Identificar o Ano:** Geralmente o ano vigente (ou o próximo, se a letra for de um mês já passado).
-3. **Encontrar a 3ª Sexta-feira:** * Vá para o dia 01 do mês identificado.
-  - Conte as sextas-feiras até chegar na terceira.
-  - **Atenção:** Se a 3ª sexta-feira for feriado, o vencimento é antecipado para o dia útil anterior.
-
----
-
-### 3. Exemplo de Texto para a Interface do Usuário
-
-> "As opções da B3 vencem mensalmente na **terceira sexta-feira do mês**. A letra no código do ativo identifica o mês de expiração e o tipo da opção. Por exemplo, uma opção com a letra **'A'** vence em Janeiro e é uma **Call**, enquanto a letra **'M'** também vence em Janeiro, mas é uma **Put**."
+- **`detectStrategy(legs)`**: Retorna objeto com tipo da estrategia e metricas especificas
+- **Collar**: Stock (buy) + Put (buy) + Call (sell), mesmo ativo-base, mesmo vencimento
+  - Custo de montagem: `(preco_ativo * qty) + (premio_put * qty) - (premio_call * qty)`
+  - Breakeven real: `custo_total / qty`
+  - Lucro max: `(strike_call - breakeven) * qty`
+  - Perda max: `(breakeven - strike_put) * qty` -- se negativo, "Risco Zero"
+  - Exemplo do print: `(39.41*100) + (1.53*100) - (1.82*100) = R$ 3.912,00` -> breakeven = 39.12
+- Retorna `{ type: "Collar", label: "Collar (Financiamento com Protecao)", montageTotal, breakeven, maxProfit, maxLoss, isRiskFree }`
 
 ---
 
-### Dica para o Desenvolvedor
+## 3. OCR: Edge Function `analyze-options-image`
 
-Se você estiver programando em Python ou JavaScript, não tente "chutar" o dia 15 ou 20. Use bibliotecas de calendário para encontrar o `weekday == 4` (sexta-feira) e conte a terceira ocorrência.
+Refinar o prompt do Gemini para leitura precisa do BTG/Profit:
 
-&nbsp;
-
-ara o seu app funcionar perfeitamente em **2026**, aqui estão as datas exatas de vencimento das opções mensais da B3.
-
-Como a regra é a **terceira sexta-feira do mês**, em meses onde esse dia cai em um feriado, o vencimento é **antecipado** para o dia útil anterior (quinta-feira).
-
-### 📅 Calendário de Vencimento 2026
-
-
-|               |          |         |                        |                                                |
-| ------------- | -------- | ------- | ---------------------- | ---------------------------------------------- |
-| **Mês**       | **Call** | **Put** | **Data de Vencimento** | **Observação**                                 |
-| **Janeiro**   | A        | M       | **16/01/2026**         | &nbsp;                                         |
-| **Fevereiro** | B        | N       | **20/02/2026**         | &nbsp;                                         |
-| **Março**     | C        | O       | **20/03/2026**         | &nbsp;                                         |
-| **Abril**     | D        | P       | **17/04/2026**         | &nbsp;                                         |
-| **Maio**      | E        | Q       | **14/05/2026**         | Antecipado (15/05 é feriado de Maio*)          |
-| **Junho**     | F        | R       | **19/06/2026**         | &nbsp;                                         |
-| **Julho**     | G        | S       | **17/07/2026**         | &nbsp;                                         |
-| **Agosto**    | H        | T       | **21/08/2026**         | &nbsp;                                         |
-| **Setembro**  | I        | U       | **18/09/2026**         | &nbsp;                                         |
-| **Outubro**   | J        | V       | **16/10/2026**         | &nbsp;                                         |
-| **Novembro**  | K        | W       | **19/11/2026**         | Antecipado (20/11 é feriado Consciência Negra) |
-| **Dezembro**  | L        | X       | **18/12/2026**         | &nbsp;                                         |
-
-
-> **Nota importante para o seu código:** Em 2026, o feriado de 1º de Maio cai em uma sexta-feira, mas o vencimento de maio é na **terceira** sexta (dia 15). Como dia 15 não é feriado nacional, a data padrão se mantém. O único ajuste crítico por feriado nacional na terceira sexta-feira em 2026 é em **Novembro** (Dia da Consciência Negra).
+- **Regra estrita de sinais**: "C" (botao verde) = "buy", "V" (botao roxo/vermelho) = "sell"
+- **Ativo-objeto**: Quando coluna Call/Put mostra "-", e o ticker e tipo base (PETR4, VALE3), extrair como `option_type: "stock"`, `side: "buy"`, `price: 0`, `strike: preco_unitario`
+- **Identificacao por letra do ticker**: PETRP... = Put (P = Abril), PETRD... = Call (D = Abril)
+- **Instrucao de dupla verificacao**: "Conte as linhas da tabela. Se a imagem tem 3 linhas, voce DEVE retornar exatamente 3 pernas"
+- **Valores em BRL**: normalizar "BRL 39,41" -> 39.41, "BRL 1,53" -> 1.53
+- Na normalizacao backend: garantir `quantity` sempre positivo, `side` determina direcao
 
 ---
 
-### 💡 Dica de Implementação (Lógica de Feriados)
+## 4. Atualizar `src/lib/types.ts`
 
-Para o seu app ser robusto, não basta calcular a 3ª sexta-feira. Você deve incluir uma verificação de **calendário de feriados bancários da B3**.
+Adicionar campos ao `AnalysisMetrics`:
 
-&nbsp;
-
-e sempre ficar atento ao ano vigente automaticamente 
-
-&nbsp;
-
-### 1. Melhorar OCR (Edge Function `analyze-options-image`)
-
-- Adicionar ao prompt e ao schema o suporte para `option_type: "stock"` (ativo-objeto, sem call/put)
-- Instrucao explicita: "Se a linha nao tem Call/Put ou mostra '-', trate como compra/venda do ativo-objeto com option_type='stock'"
-- Na normalizacao, aceitar `option_type: "stock"` como valido
-- Adicionar instrucao de dupla verificacao: "Conte o numero de linhas da tabela e garanta que o numero de pernas extraidas e igual"
-
-### 2. Atualizar tipo `Leg` e logica de payoff
-
-- Adicionar `'stock'` ao tipo `option_type` em `src/lib/types.ts`
-- Em `src/lib/payoff.ts`, tratar `option_type === 'stock'` no calculo: payoff = (spotPrice - strike) * multiplier * quantity (sem subtrair price separadamente, ou tratar strike como preco de compra)
-- Na LegsTable, adicionar opcao "Ativo" no dropdown de tipo
-
-### 3. Botao X para limpar imagem (`ImageUpload.tsx`)
-
-- Adicionar botao X sobre a preview da imagem
-- Ao clicar, limpa o preview e permite novo upload
-- Impedir que o click do X propague e abra o file picker
-
-### 4. Linha CDI no grafico de payoff (`PayoffChart.tsx`)
-
-- Receber `cdiRate` e `daysToExpiry` como props
-- Calcular retorno CDI para o capital investido e plotar como linha horizontal laranja
-- Adicionar legenda "CDI" ao grafico
-
-### 5. CDI padrao 14,90% e destaque vs CDI
-
-- Em `Dashboard.tsx`, inicializar `cdiRate` com `14.90` em vez de `0`
-- No `CDIComparison.tsx`, mostrar em destaque grande: "X% acima do CDI" ou "X% abaixo do CDI" com cor verde/vermelha
-- Calcular a diferenca percentual entre o ROI da estrategia e o ROI do CDI
-
-### 6. Correcoes na LegsTable
-
-- Adicionar opcao "Ativo" no select de tipo para pernas tipo `stock`
+```text
+strategyType?: string
+strategyLabel?: string
+montageTotal?: number
+realBreakeven?: number
+isRiskFree?: boolean
+cdiReturn?: number
+cdiEfficiency?: number  // % do CDI (ex: 166%)
+```
 
 ---
 
-## Detalhes tecnicos
+## 5. Atualizar `src/lib/payoff.ts`
 
-### Arquivos modificados
+- **`calculateMetrics`**: Integrar `detectStrategy()` para enriquecer metricas com dados do Collar
+- **`calculateCollarNetCost`**: Funcao especifica: `(stock.strike * qty) + (put.price * qty) - (call.price * qty)`
+- **CDI no payoff**: Exportar funcao `calculateCDIOpportunityCost(capital, rate, businessDays)` usando formula `capital * ((1 + rate/100)^(days/252) - 1)`
+- Manter `netCost` generico para estruturas que nao sao Collar
 
+---
 
-| Arquivo                                             | Alteracao                                     |
-| --------------------------------------------------- | --------------------------------------------- |
-| `supabase/functions/analyze-options-image/index.ts` | Prompt + schema com stock, dupla verificacao  |
-| `src/lib/types.ts`                                  | `option_type: 'call' | 'put' | 'stock'`       |
-| `src/lib/payoff.ts`                                 | Calculo payoff para stock                     |
-| `src/components/ImageUpload.tsx`                    | Botao X para limpar                           |
-| `src/components/PayoffChart.tsx`                    | Linha CDI laranja                             |
-| `src/components/CDIComparison.tsx`                  | Destaque % vs CDI                             |
-| `src/components/LegsTable.tsx`                      | Opcao "Ativo" no dropdown                     |
-| `src/pages/Dashboard.tsx`                           | CDI padrao 14.90, passar props ao PayoffChart |
+## 6. `src/components/PayoffChart.tsx` -- Grafico Profissional
+
+Reescrever com 3 zonas de cor relativas ao CDI:
+
+- **Vermelho** (area abaixo de zero): prejuizo
+- **Laranja** (area entre zero e CDI): lucro, mas perde para renda fixa
+- **Verde** (area acima do CDI): operacao vencedora
+- **Linha CDI horizontal tracejada**: cor dourada (hsl 45 95% 55%), com label "CDI R$ X.XX"
+- **Linha de payoff principal**: branca/clara, 2px
+- **Breakeven markers**: linhas verticais tracejadas amarelas
+- Receber `cdiReturn` calculado como prop para posicionar a linha corretamente
+
+---
+
+## 7. `src/components/MetricsCards.tsx` -- Cards Institucionais
+
+5 cards com estilo terminal Bloomberg:
+
+| Card | Calculo |
+|---|---|
+| Custo de Montagem | Para Collar: (Ativo + Put - Call) * Qty. Generico: netCost |
+| Lucro Maximo | (Strike Call - Breakeven) * Qty ou metrica generica |
+| Risco Maximo | (Breakeven - Strike Put) * Qty. Se negativo: "Risco Zero" |
+| Breakeven Real | Custo Total / Qty |
+| Eficiencia vs CDI | "166% do CDI" ou "+X.XX% acima do CDI" |
+
+- Fonte monoesspacada (JetBrains Mono) em todos os valores
+- Badge "RISCO ZERO" em verde quando strike da put > breakeven
+- Badge "VENCE O CDI" quando eficiencia > 100%
+
+---
+
+## 8. `src/components/CDIComparison.tsx` -- Comparador Completo
+
+- Manter inputs de CDI e dias uteis
+- **Auto-preenchimento**: quando legs mudam, inferir vencimento pela letra do ticker e calcular dias uteis automaticamente
+- **Card principal**: "Esta estrutura rende X% do CDI esperado"
+- **Barras comparativas**: Retorno da Estrutura vs Retorno CDI no periodo
+- Usar `countBusinessDays` do modulo centralizado `b3-calendar.ts`
+- Remover duplicacao de funcoes de calendario
+
+---
+
+## 9. `src/pages/Dashboard.tsx` -- Integracao
+
+- Importar `detectStrategy` e `b3-calendar`
+- Remover funcoes duplicadas (calendar, holidays, countBusinessDays)
+- Quando Collar detectado: mostrar badge "Collar (Financiamento com Protecao)" e card especifico com custo real
+- Passar `strategyInfo` para MetricsCards e CDIComparison
+- CDI padrao: 14.90%
+- Auto-inferir vencimento e dias uteis dos tickers
+
+---
+
+## 10. `analyze-structure` Edge Function -- IA Objetiva
+
+- Incluir dados do Collar no prompt: custo real, breakeven, se e risco zero
+- Incluir comparativo CDI calculado no prompt
+- Resposta mais curta e objetiva: veredito em 1 linha + justificativa em 2 linhas max
+- Adicionar campo `cdi_efficiency` no schema de resposta
+
+---
+
+## 11. Visual Dark Mode Profissional
+
+- Manter tema Slate/Zinc atual (ja esta bom)
+- Garantir `font-mono` (JetBrains Mono) em TODOS os valores financeiros
+- Cards com bordas sutis, fundo `bg-muted/20`
+- Footer juridico ja existe -- manter
+
+---
+
+## Arquivos Modificados
+
+| Arquivo | Acao |
+|---|---|
+| `src/lib/b3-calendar.ts` | **NOVO** -- calendario centralizado, dias uteis, feriados |
+| `src/lib/strategies.ts` | **NOVO** -- deteccao de Collar e calculo de metricas especificas |
+| `src/lib/types.ts` | Adicionar campos de estrategia ao AnalysisMetrics |
+| `src/lib/payoff.ts` | Integrar strategies, CDI oportunidade |
+| `supabase/functions/analyze-options-image/index.ts` | Prompt OCR refinado para BTG |
+| `supabase/functions/analyze-structure/index.ts` | Prompt mais objetivo + dados Collar |
+| `src/components/PayoffChart.tsx` | 3 zonas de cor + linha CDI dourada |
+| `src/components/MetricsCards.tsx` | Cards estilo terminal com metricas Collar |
+| `src/components/CDIComparison.tsx` | Comparador com eficiencia % do CDI |
+| `src/pages/Dashboard.tsx` | Integrar modules, remover duplicacao |

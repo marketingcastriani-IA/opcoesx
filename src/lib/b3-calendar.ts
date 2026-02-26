@@ -1,55 +1,65 @@
-// B3 Calendar Engine - Centralized ticker identification and business day calculations
+// B3 Calendar Engine - Dynamic for any year
 
 const CALL_LETTERS = 'ABCDEFGHIJKL';
 const PUT_LETTERS = 'MNOPQRSTUVWX';
 
-// Hardcoded B3 expiry dates for 2026 (3rd Friday rule, adjusted for holidays)
-const EXPIRY_CALENDAR_2026: Record<number, string> = {
-  1: '2026-01-16',
-  2: '2026-02-20',
-  3: '2026-03-20',
-  4: '2026-04-17',
-  5: '2026-05-15',
-  6: '2026-06-19',
-  7: '2026-07-17',
-  8: '2026-08-21',
-  9: '2026-09-18',
-  10: '2026-10-16',
-  11: '2026-11-19', // Thu - anticipated from 20/11 (Consciência Negra)
-  12: '2026-12-18',
-};
-
-// Brazilian bank holidays 2026
-const BANK_HOLIDAYS_2026 = new Set([
-  '2026-01-01', // Confraternização Universal
-  '2026-02-16', // Carnaval
-  '2026-02-17', // Carnaval
-  '2026-04-03', // Sexta-feira Santa
-  '2026-04-21', // Tiradentes
-  '2026-05-01', // Dia do Trabalho
-  '2026-06-04', // Corpus Christi
-  '2026-09-07', // Independência
-  '2026-10-12', // N. Sra. Aparecida
-  '2026-11-02', // Finados
-  '2026-11-15', // Proclamação da República
-  '2026-11-20', // Consciência Negra
-  '2026-12-25', // Natal
-]);
-
-export const EXPIRY_OPTIONS = [
-  { label: 'Jan 2026 (16/01)', date: '2026-01-16', month: 1 },
-  { label: 'Fev 2026 (20/02)', date: '2026-02-20', month: 2 },
-  { label: 'Mar 2026 (20/03)', date: '2026-03-20', month: 3 },
-  { label: 'Abr 2026 (17/04)', date: '2026-04-17', month: 4 },
-  { label: 'Mai 2026 (15/05)', date: '2026-05-15', month: 5 },
-  { label: 'Jun 2026 (19/06)', date: '2026-06-19', month: 6 },
-  { label: 'Jul 2026 (17/07)', date: '2026-07-17', month: 7 },
-  { label: 'Ago 2026 (21/08)', date: '2026-08-21', month: 8 },
-  { label: 'Set 2026 (18/09)', date: '2026-09-18', month: 9 },
-  { label: 'Out 2026 (16/10)', date: '2026-10-16', month: 10 },
-  { label: 'Nov 2026 (19/11)', date: '2026-11-19', month: 11 },
-  { label: 'Dez 2026 (18/12)', date: '2026-12-18', month: 12 },
+// Brazilian bank holidays that are FIXED dates (recur every year)
+const FIXED_HOLIDAYS = [
+  { month: 1, day: 1 },   // Confraternização Universal
+  { month: 4, day: 21 },  // Tiradentes
+  { month: 5, day: 1 },   // Dia do Trabalho
+  { month: 9, day: 7 },   // Independência
+  { month: 10, day: 12 }, // N. Sra. Aparecida
+  { month: 11, day: 2 },  // Finados
+  { month: 11, day: 15 }, // Proclamação da República
+  { month: 11, day: 20 }, // Consciência Negra
+  { month: 12, day: 25 }, // Natal
 ];
+
+// Easter-based holidays use a helper
+function getEasterDate(year: number): Date {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+
+function getBankHolidays(year: number): Set<string> {
+  const holidays = new Set<string>();
+
+  // Fixed holidays
+  for (const h of FIXED_HOLIDAYS) {
+    holidays.add(formatDateKey(new Date(year, h.month - 1, h.day)));
+  }
+
+  // Easter-based movable holidays
+  const easter = getEasterDate(year);
+  const easterMs = easter.getTime();
+  const day = 24 * 60 * 60 * 1000;
+
+  // Carnaval (47 and 48 days before Easter)
+  holidays.add(formatDateKey(new Date(easterMs - 47 * day)));
+  holidays.add(formatDateKey(new Date(easterMs - 48 * day)));
+
+  // Sexta-feira Santa (2 days before Easter)
+  holidays.add(formatDateKey(new Date(easterMs - 2 * day)));
+
+  // Corpus Christi (60 days after Easter)
+  holidays.add(formatDateKey(new Date(easterMs + 60 * day)));
+
+  return holidays;
+}
 
 function formatDateKey(date: Date): string {
   const y = date.getFullYear();
@@ -57,6 +67,46 @@ function formatDateKey(date: Date): string {
   const d = `${date.getDate()}`.padStart(2, '0');
   return `${y}-${m}-${d}`;
 }
+
+// Calculate the 3rd Friday of a given month/year, adjusted for holidays
+function getThirdFriday(year: number, month: number): Date {
+  // month is 1-based
+  const firstDay = new Date(year, month - 1, 1);
+  const firstDow = firstDay.getDay(); // 0=Sun
+  // Find first Friday: day of week 5
+  let firstFriday = 1 + ((5 - firstDow + 7) % 7);
+  const thirdFriday = firstFriday + 14;
+  let expiry = new Date(year, month - 1, thirdFriday);
+
+  // If it's a holiday, go to previous business day
+  const holidays = getBankHolidays(year);
+  while (expiry.getDay() === 0 || expiry.getDay() === 6 || holidays.has(formatDateKey(expiry))) {
+    expiry.setDate(expiry.getDate() - 1);
+  }
+  return expiry;
+}
+
+const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+
+export function getExpiryOptions(year?: number): { label: string; date: string; month: number }[] {
+  const y = year ?? new Date().getFullYear();
+  const options: { label: string; date: string; month: number }[] = [];
+  for (let m = 1; m <= 12; m++) {
+    const d = getThirdFriday(y, m);
+    const dateStr = formatDateKey(d);
+    const dayStr = `${d.getDate()}`.padStart(2, '0');
+    const monthStr = `${d.getMonth() + 1}`.padStart(2, '0');
+    options.push({
+      label: `${MONTH_NAMES[m - 1]} ${y} (${dayStr}/${monthStr})`,
+      date: dateStr,
+      month: m,
+    });
+  }
+  return options;
+}
+
+// Keep backwards compat
+export const EXPIRY_OPTIONS = getExpiryOptions();
 
 export function getOptionTypeFromLetter(letter: string): 'call' | 'put' | null {
   const upper = letter.toUpperCase();
@@ -79,23 +129,37 @@ export function getExpiryFromTicker(ticker: string): Date | null {
   const letter = ticker[4].toUpperCase();
   const month = getMonthFromLetter(letter);
   if (!month) return null;
-  const expiryStr = EXPIRY_CALENDAR_2026[month];
-  if (!expiryStr) return null;
-  const [y, m, d] = expiryStr.split('-').map(Number);
-  return new Date(y, m - 1, d);
+
+  // Use current year, but if the expiry month already passed, use next year
+  const now = new Date();
+  let year = now.getFullYear();
+  const expiry = getThirdFriday(year, month);
+  if (expiry < now) {
+    year += 1;
+    return getThirdFriday(year, month);
+  }
+  return expiry;
 }
 
 export function countBusinessDays(from: Date, to: Date): number {
   const start = new Date(from.getFullYear(), from.getMonth(), from.getDate());
   const end = new Date(to.getFullYear(), to.getMonth(), to.getDate());
   if (end <= start) return 0;
+
+  // Collect holidays for all years in range
+  const holidays = new Set<string>();
+  for (let y = start.getFullYear(); y <= end.getFullYear(); y++) {
+    for (const h of getBankHolidays(y)) {
+      holidays.add(h);
+    }
+  }
+
   let count = 0;
   const current = new Date(start);
   while (current < end) {
     current.setDate(current.getDate() + 1);
     const day = current.getDay();
-    const key = formatDateKey(current);
-    if (day !== 0 && day !== 6 && !BANK_HOLIDAYS_2026.has(key)) {
+    if (day !== 0 && day !== 6 && !holidays.has(formatDateKey(current))) {
       count += 1;
     }
   }

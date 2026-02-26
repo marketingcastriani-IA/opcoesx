@@ -53,7 +53,7 @@ const normalizeLegs = (legs: RawLeg[] | undefined) => {
       const strike = optionType === "stock" ? (strikeRaw > 0 ? strikeRaw : priceRaw) : strikeRaw;
       const price = optionType === "stock" ? 0 : priceRaw;
       const rawQty = Math.max(1, Math.round(toNumber(leg.quantity) || 1));
-      const quantity = side === "sell" ? -Math.abs(rawQty) : Math.abs(rawQty);
+      const quantity = Math.abs(rawQty);
 
       if (!side || !optionType || !asset || strike <= 0) return null;
       if (optionType !== "stock" && price <= 0) return null;
@@ -106,12 +106,12 @@ serve(async (req) => {
 OBJETIVO: Extrair TODAS as pernas da grade de ordens/book de ofertas. NÃO invente pernas. NÃO omita pernas.
 
 REGRAS CRÍTICAS:
-1. side: "buy" para Compra/C/+, "sell" para Venda/V/-
+1. side: "buy" para Compra (C), "sell" para Venda (V) — regra estrita (C = COMPRA, V = VENDA)
 2. option_type: "call" para Call/C, "put" para Put/P, "stock" para ativo-objeto (quando o campo Call/Put mostra "-", "Ação", está vazio ou é o próprio ticker base como PETR4)
 3. asset: ticker em maiúsculas (ex: PETR4, VALE3, PETRD325, etc)
 4. strike: preço de exercício como número decimal. Para pernas "stock", use o preço unitário de compra/venda do ativo
 5. price: prêmio da opção como número decimal. Para pernas "stock", use 0
-6. quantity: quantidade inteira >= 1 (o app interpretará o sinal pela side)
+6. quantity: quantidade inteira >= 1 (o app interpretará o sinal pela side). Nunca envie quantidade negativa.
 
 DUPLA VERIFICAÇÃO: Conte quantas linhas a tabela da imagem possui. O número de pernas extraídas DEVE ser igual ao número de linhas. Se faltar alguma, revise.
 

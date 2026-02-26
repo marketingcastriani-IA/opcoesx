@@ -32,9 +32,48 @@ const expiryCalendar2026 = [
   { label: 'Dez 2026 (18/12)', date: '2026-12-18' },
 ];
 
+const bankHolidays2026 = new Set([
+  '2026-01-01',
+  '2026-02-16',
+  '2026-02-17',
+  '2026-04-03',
+  '2026-04-21',
+  '2026-05-01',
+  '2026-06-04',
+  '2026-09-07',
+  '2026-10-12',
+  '2026-11-02',
+  '2026-11-15',
+  '2026-12-25',
+]);
+
 const parseDate = (value: string) => {
   const [year, month, day] = value.split('-').map(Number);
   return new Date(year, month - 1, day);
+};
+
+const formatDateKey = (date: Date) => {
+  const y = date.getFullYear();
+  const m = `${date.getMonth() + 1}`.padStart(2, '0');
+  const d = `${date.getDate()}`.padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const countBusinessDays = (from: Date, to: Date) => {
+  const start = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  const end = new Date(to.getFullYear(), to.getMonth(), to.getDate());
+  if (end <= start) return 0;
+  let count = 0;
+  const current = new Date(start);
+  while (current < end) {
+    current.setDate(current.getDate() + 1);
+    const day = current.getDay();
+    const key = formatDateKey(current);
+    if (day !== 0 && day !== 6 && !bankHolidays2026.has(key)) {
+      count += 1;
+    }
+  }
+  return count;
 };
 
 const calculateDaysToExpiry = (value: string) => {
@@ -42,8 +81,7 @@ const calculateDaysToExpiry = (value: string) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const target = parseDate(value);
-  const diff = Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-  return diff > 0 ? diff : 0;
+  return countBusinessDays(today, target);
 };
 
 export default function CDIComparison({ metrics, cdiRate, setCdiRate, daysToExpiry, setDaysToExpiry }: CDIComparisonProps) {
@@ -109,7 +147,7 @@ export default function CDIComparison({ metrics, cdiRate, setCdiRate, daysToExpi
             <Input type="number" step="0.01" value={cdiRate || ''} onChange={e => setCdiRate(parseFloat(e.target.value) || 0)} placeholder="13.65" />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Dias até vencimento</Label>
+            <Label className="text-xs">Dias úteis até vencimento</Label>
             <Input type="number" min={1} value={daysToExpiry || ''} onChange={e => setDaysToExpiry(parseInt(e.target.value) || 0)} placeholder="30" />
           </div>
           <div className="space-y-1">
@@ -181,7 +219,6 @@ export default function CDIComparison({ metrics, cdiRate, setCdiRate, daysToExpi
 
             {comparison && (
               <div className="rounded-lg border bg-muted/40 p-4 space-y-3">
-                {/* Highlight % difference */}
                 <div className="text-center">
                   {optionRoi !== null && Number.isFinite(optionRoi) ? (
                     <div className={`text-3xl font-extrabold ${optionRoi - cdiRoi >= 0 ? 'text-success' : 'text-destructive'}`}>

@@ -5,12 +5,13 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 
 interface MetricsCardsProps {
   metrics: AnalysisMetrics;
+  cdiReturn?: number;
+  daysToExpiry?: number;
 }
 
-export default function MetricsCards({ metrics }: MetricsCardsProps) {
+export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsProps) {
   const maxGainValue = metrics.maxGain === 'Ilimitado' ? null : Number(metrics.maxGain);
   const maxLossValue = metrics.maxLoss === 'Ilimitado' ? null : Number(metrics.maxLoss);
-  const cdiReturn = (metrics as any)?.cdiReturn ?? 0;
   const efficiency = cdiReturn > 0 && maxGainValue !== null
     ? ((maxGainValue - cdiReturn) / cdiReturn) * 100
     : null;
@@ -45,7 +46,7 @@ export default function MetricsCards({ metrics }: MetricsCardsProps) {
       tip: 'Preço do ativo onde a operação não dá lucro nem prejuízo.',
     },
     {
-      title: 'Eficiência vs CDI %',
+      title: 'Eficiência vs CDI',
       value: efficiency === null ? 'N/A' : `${efficiency.toFixed(1)}%`,
       icon: Percent,
       color: efficiency !== null && efficiency >= 0 ? 'text-success' : 'text-destructive',
@@ -58,7 +59,7 @@ export default function MetricsCards({ metrics }: MetricsCardsProps) {
       {items.map(item => (
         <Tooltip key={item.title}>
           <TooltipTrigger asChild>
-            <Card className="cursor-help transition-colors hover:border-primary/30">
+            <Card className="cursor-help transition-colors hover:border-primary/30 bg-muted/20 border-border/60">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-xs font-medium text-muted-foreground">{item.title}</CardTitle>
                 <item.icon className={`h-4 w-4 ${item.color}`} />

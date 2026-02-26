@@ -33,4 +33,11 @@ export interface AnalysisMetrics {
   maxLoss: number | 'Ilimitado';
   breakevens: number[];
   netCost: number;
+  strategyType?: string;
+  strategyLabel?: string;
+  montageTotal?: number;
+  realBreakeven?: number;
+  isRiskFree?: boolean;
+  cdiReturn?: number;
+  cdiEfficiency?: number;
 }

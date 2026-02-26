@@ -9,95 +9,17 @@ import MetricsCards from '@/components/MetricsCards';
 import CDIComparison from '@/components/CDIComparison';
 import ImageUpload from '@/components/ImageUpload';
 import { Leg } from '@/lib/types';
-import { generatePayoffCurve, calculateMetrics, calculateCDIReturn } from '@/lib/payoff';
+import { generatePayoffCurve, calculateMetrics, calculateCDIReturn, calculateCDIOpportunityCost } from '@/lib/payoff';
+import { getExpiryFromTicker, countBusinessDays } from '@/lib/b3-calendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Save, Sparkles, Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-
-const monthMapCalls = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
-const monthMapPuts = ['M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X'];
-
-const expiryCalendar2026: Record<number, string> = {
-  1: '2026-01-16',
-  2: '2026-02-20',
-  3: '2026-03-20',
-  4: '2026-04-17',
-  5: '2026-05-15',
-  6: '2026-06-19',
-  7: '2026-07-17',
-  8: '2026-08-21',
-  9: '2026-09-18',
-  10: '2026-10-16',
-  11: '2026-11-19',
-  12: '2026-12-18',
-};
-
-const bankHolidays2026 = new Set([
-  '2026-01-01',
-  '2026-02-16',
-  '2026-02-17',
-  '2026-04-03',
-  '2026-04-21',
-  '2026-05-01',
-  '2026-06-04',
-  '2026-09-07',
-  '2026-10-12',
-  '2026-11-02',
-  '2026-11-15',
-  '2026-12-25',
-]);
-
-const formatDateKey = (date: Date) => {
-  const y = date.getFullYear();
-  const m = `${date.getMonth() + 1}`.padStart(2, '0');
-  const d = `${date.getDate()}`.padStart(2, '0');
-  return `${y}-${m}-${d}`;
-};
-
-const countBusinessDays = (from: Date, to: Date) => {
-  const start = new Date(from.getFullYear(), from.getMonth(), from.getDate());
-  const end = new Date(to.getFullYear(), to.getMonth(), to.getDate());
-  if (end <= start) return 0;
-  let count = 0;
-  const current = new Date(start);
-  while (current < end) {
-    current.setDate(current.getDate() + 1);
-    const day = current.getDay();
-    const key = formatDateKey(current);
-    if (day !== 0 && day !== 6 && !bankHolidays2026.has(key)) {
-      count += 1;
-    }
-  }
-  return count;
-};
-
-const getExpiryFromTicker = (ticker: string) => {
-  const letter = ticker?.[4]?.toUpperCase() || '';
-  const callIndex = monthMapCalls.indexOf(letter);
-  const putIndex = monthMapPuts.indexOf(letter);
-  const month = callIndex >= 0 ? callIndex + 1 : putIndex >= 0 ? putIndex + 1 : null;
-  if (!month) return null;
-  const expiryDate = expiryCalendar2026[month];
-  return expiryDate ? new Date(expiryDate) : null;
-};
-
-const detectCollar = (legs: Leg[]) => {
-  const stock = legs.find(l => l.option_type === 'stock' && l.side === 'buy');
-  const put = legs.find(l => l.option_type === 'put' && l.side === 'buy');
-  const call = legs.find(l => l.option_type === 'call' && l.side === 'sell');
-  if (!stock || !put || !call) return false;
-  const root = stock.asset.slice(0, 4);
-  const putRoot = put.asset.slice(0, 4);
-  const callRoot = call.asset.slice(0, 4);
-  const putExpiry = getExpiryFromTicker(put.asset);
-  const callExpiry = getExpiryFromTicker(call.asset);
-  return root && root === putRoot && root === callRoot && !!putExpiry && !!callExpiry;
-};
 
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
@@ -112,12 +34,11 @@ export default function Dashboard() {
   const metrics = useMemo(() => calculateMetrics(legs), [legs]);
   const payoffData = useMemo(() => generatePayoffCurve(legs), [legs]);
 
+  // Auto-infer expiry from option tickers
   const inferredExpiry = useMemo(() => {
     const leg = legs.find(l => l.option_type !== 'stock');
     return leg ? getExpiryFromTicker(leg.asset) : null;
   }, [legs]);
-
-  const strategyTag = useMemo(() => (detectCollar(legs) ? 'Collar (Financiamento com Proteção)' : ''), [legs]);
 
   useEffect(() => {
     if (inferredExpiry) {
@@ -126,11 +47,16 @@ export default function Dashboard() {
     }
   }, [inferredExpiry]);
 
+  // CDI return for invested capital
+  const investedCapital = useMemo(() => {
+    if (metrics.montageTotal) return Math.abs(metrics.montageTotal);
+    return Math.max(Math.abs(metrics.netCost || 0), 1);
+  }, [metrics]);
+
   const cdiReturn = useMemo(() => {
     if (!cdiRate || daysToExpiry <= 0) return 0;
-    const invested = Math.max(Math.abs(metrics.netCost || 0), 1);
-    return calculateCDIReturn(invested, cdiRate, daysToExpiry, false);
-  }, [metrics.netCost, cdiRate, daysToExpiry]);
+    return calculateCDIOpportunityCost(investedCapital, cdiRate, daysToExpiry);
+  }, [investedCapital, cdiRate, daysToExpiry]);
 
   const addLeg = useCallback((leg: Leg) => {
     setLegs(prev => [...prev, leg]);
@@ -159,7 +85,18 @@ export default function Dashboard() {
     setLoadingAI(true);
     try {
       const { data, error } = await supabase.functions.invoke('analyze-structure', {
-        body: { legs, metrics, cdiRate, daysToExpiry },
+        body: {
+          legs,
+          metrics: {
+            ...metrics,
+            cdiReturn,
+            cdiEfficiency: cdiReturn > 0 && typeof metrics.maxGain === 'number'
+              ? Math.round((metrics.maxGain / cdiReturn) * 100)
+              : null,
+          },
+          cdiRate,
+          daysToExpiry,
+        },
       });
       if (error) throw error;
       setAiSuggestion(data.suggestion || 'Sem sugestão disponível.');
@@ -219,10 +156,15 @@ export default function Dashboard() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold">Nova Análise</h1>
-              {strategyTag && (
-                <span className="text-xs px-2 py-1 rounded-full border border-primary/40 text-primary font-medium">
-                  {strategyTag}
-                </span>
+              {metrics.strategyLabel && (
+                <Badge variant="outline" className="border-primary/40 text-primary">
+                  {metrics.strategyLabel}
+                </Badge>
+              )}
+              {metrics.isRiskFree && (
+                <Badge className="bg-success text-success-foreground text-[10px]">
+                  RISCO ZERO
+                </Badge>
               )}
             </div>
             <p className="text-sm text-muted-foreground">Monte sua estrutura de opções e analise os riscos</p>
@@ -268,7 +210,14 @@ export default function Dashboard() {
             <Card>
               <CardHeader><CardTitle className="text-base">Gráfico de Payoff</CardTitle></CardHeader>
               <CardContent>
-                <PayoffChart data={payoffData} breakevens={metrics.breakevens} cdiRate={cdiRate} daysToExpiry={daysToExpiry} netCost={metrics.netCost} />
+                <PayoffChart
+                  data={payoffData}
+                  breakevens={metrics.realBreakeven ? [metrics.realBreakeven] : metrics.breakevens}
+                  cdiRate={cdiRate}
+                  daysToExpiry={daysToExpiry}
+                  netCost={metrics.netCost}
+                  montageTotal={metrics.montageTotal}
+                />
               </CardContent>
             </Card>
             <CDIComparison metrics={metrics} cdiRate={cdiRate} setCdiRate={setCdiRate} daysToExpiry={daysToExpiry} setDaysToExpiry={setDaysToExpiry} />

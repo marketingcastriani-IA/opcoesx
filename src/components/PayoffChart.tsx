@@ -43,6 +43,15 @@ export default function PayoffChart({ data, breakevens, cdiRate = 0, daysToExpir
     };
   });
 
+  const prices = data.map((p) => p.price);
+  const minPrice = Math.min(...prices);
+  const maxPrice = Math.max(...prices);
+
+  const profits = data.map((p) => p.profitAtExpiry);
+  const minProfit = Math.min(...profits, cdiValue ?? 0);
+  const maxProfit = Math.max(...profits, cdiValue ?? 0);
+  const padding = Math.max((maxProfit - minProfit) * 0.1, 1);
+
   return (
     <ChartContainer config={chartConfig} className="h-[320px] w-full">
       <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
@@ -61,8 +70,20 @@ export default function PayoffChart({ data, breakevens, cdiRate = 0, daysToExpir
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-        <XAxis dataKey="price" tickFormatter={v => v.toFixed(0)} className="text-xs" />
-        <YAxis tickFormatter={v => v.toFixed(0)} className="text-xs" />
+        <XAxis
+          type="number"
+          dataKey="price"
+          domain={[minPrice, maxPrice]}
+          tickFormatter={(v) => v.toFixed(2)}
+          tickCount={8}
+          interval="preserveStartEnd"
+          className="text-xs"
+        />
+        <YAxis
+          domain={[minProfit - padding, maxProfit + padding]}
+          tickFormatter={(v) => v.toFixed(0)}
+          className="text-xs"
+        />
         <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" />
         {breakevens.map((be, i) => (
           <ReferenceLine key={i} x={be} stroke="hsl(var(--warning))" strokeDasharray="4 4" label={{ value: `BE ${be.toFixed(2)}`, position: 'top', fill: 'hsl(var(--warning))', fontSize: 11 }} />

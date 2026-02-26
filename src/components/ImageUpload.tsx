@@ -1,7 +1,6 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Upload, Image, Loader2 } from 'lucide-react';
+import { Upload, Loader2 } from 'lucide-react';
 import { Leg } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -15,11 +14,11 @@ export default function ImageUpload({ onLegsExtracted }: ImageUploadProps) {
   const [preview, setPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const processImage = useCallback(async (base64: string) => {
+  const processImage = useCallback(async (imageDataUrl: string) => {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('analyze-options-image', {
-        body: { image: base64 },
+        body: { imageDataUrl },
       });
       if (error) throw error;
       if (data?.legs && data.legs.length > 0) {
@@ -41,28 +40,48 @@ export default function ImageUpload({ onLegsExtracted }: ImageUploadProps) {
       toast.error('Por favor, envie uma imagem.');
       return;
     }
+
     const reader = new FileReader();
     reader.onload = (e) => {
       const result = e.target?.result as string;
+      if (!result?.startsWith('data:image/')) {
+        toast.error('Formato de imagem inválido.');
+        return;
+      }
       setPreview(result);
-      // Extract base64 data (remove the data:image/...;base64, prefix)
-      const base64 = result.split(',')[1];
-      processImage(base64);
+      processImage(result);
     };
     reader.readAsDataURL(file);
   }, [processImage]);
 
-  const handlePaste = useCallback((e: React.ClipboardEvent) => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
+  const handleClipboardItems = useCallback((items: DataTransferItemList | undefined | null) => {
+    if (!items) return false;
     for (const item of Array.from(items)) {
       if (item.type.startsWith('image/')) {
         const file = item.getAsFile();
-        if (file) handleFile(file);
-        break;
+        if (file) {
+          handleFile(file);
+          return true;
+        }
       }
     }
+    return false;
   }, [handleFile]);
+
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const found = handleClipboardItems(e.clipboardData?.items);
+    if (found) e.preventDefault();
+  }, [handleClipboardItems]);
+
+  useEffect(() => {
+    const onWindowPaste = (e: ClipboardEvent) => {
+      const found = handleClipboardItems(e.clipboardData?.items);
+      if (found) e.preventDefault();
+    };
+
+    window.addEventListener('paste', onWindowPaste);
+    return () => window.removeEventListener('paste', onWindowPaste);
+  }, [handleClipboardItems]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -94,8 +113,8 @@ export default function ImageUpload({ onLegsExtracted }: ImageUploadProps) {
           </>
         ) : preview ? (
           <>
-            <img src={preview} alt="Preview" className="max-h-32 rounded-lg object-contain" />
-            <p className="text-xs text-muted-foreground">Clique ou cole outra imagem para substituir</p>
+            <img src={preview} alt="Preview da imagem enviada" className="max-h-32 rounded-lg object-contain" loading="lazy" />
+            <p className="text-xs text-muted-foreground">Cole (Ctrl+V), arraste ou clique para substituir</p>
           </>
         ) : (
           <>
@@ -112,3 +131,4 @@ export default function ImageUpload({ onLegsExtracted }: ImageUploadProps) {
     </Card>
   );
 }
+

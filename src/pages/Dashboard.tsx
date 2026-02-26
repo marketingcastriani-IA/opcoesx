@@ -40,6 +40,10 @@ export default function Dashboard() {
     setLegs(prev => prev.filter((_, i) => i !== index));
   }, []);
 
+  const updateLeg = useCallback((index: number, leg: Leg) => {
+    setLegs(prev => prev.map((item, i) => (i === index ? leg : item)));
+  }, []);
+
   const handleLegsFromImage = useCallback((extractedLegs: Leg[]) => {
     setLegs(prev => [...prev, ...extractedLegs]);
   }, []);
@@ -149,7 +153,7 @@ export default function Dashboard() {
           </TabsContent>
         </Tabs>
 
-        <LegsTable legs={legs} onRemove={removeLeg} />
+        <LegsTable legs={legs} onRemove={removeLeg} onUpdate={updateLeg} />
 
         {legs.length > 0 && (
           <>

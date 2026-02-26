@@ -24,21 +24,38 @@ const toNumber = (value: unknown): number => {
   return 0;
 };
 
+const normalizeSide = (value?: string, optionType?: string) => {
+  const raw = typeof value === "string" ? value.trim().toUpperCase() : "";
+  if (raw === "C" || raw === "COMPRA" || raw === "BUY" || raw === "B") return "buy";
+  if (raw === "V" || raw === "VENDA" || raw === "SELL" || raw === "S") return "sell";
+  if (optionType === "stock") return "buy";
+  return null;
+};
+
+const normalizeOptionType = (value?: string) => {
+  const raw = typeof value === "string" ? value.trim().toUpperCase() : "";
+  if (raw === "CALL" || raw === "C") return "call";
+  if (raw === "PUT" || raw === "P") return "put";
+  if (raw === "STOCK" || raw === "AÇÃO" || raw === "ACAO" || raw === "ATIVO" || raw === "BASE") return "stock";
+  return null;
+};
+
 const normalizeLegs = (legs: RawLeg[] | undefined) => {
   if (!Array.isArray(legs)) return [];
 
   return legs
     .map((leg) => {
-      const side = leg.side === "buy" || leg.side === "sell" ? leg.side : null;
-      const optionType = leg.option_type === "call" || leg.option_type === "put" || leg.option_type === "stock"
-        ? leg.option_type : null;
+      const optionType = normalizeOptionType(leg.option_type) ?? (leg.option_type === "stock" ? "stock" : null);
+      const side = normalizeSide(leg.side, optionType ?? undefined);
       const asset = typeof leg.asset === "string" ? leg.asset.trim().toUpperCase() : "";
-      const strike = toNumber(leg.strike);
-      const price = toNumber(leg.price);
-      const quantity = Math.max(1, Math.round(toNumber(leg.quantity) || 1));
+      const strikeRaw = toNumber(leg.strike);
+      const priceRaw = toNumber(leg.price);
+      const strike = optionType === "stock" ? (strikeRaw > 0 ? strikeRaw : priceRaw) : strikeRaw;
+      const price = optionType === "stock" ? 0 : priceRaw;
+      const rawQty = Math.max(1, Math.round(toNumber(leg.quantity) || 1));
+      const quantity = side === "sell" ? -Math.abs(rawQty) : Math.abs(rawQty);
 
       if (!side || !optionType || !asset || strike <= 0) return null;
-      // For stock legs, price can be 0 (it's the spot purchase, strike = purchase price)
       if (optionType !== "stock" && price <= 0) return null;
 
       return {
@@ -94,7 +111,7 @@ REGRAS CRÍTICAS:
 3. asset: ticker em maiúsculas (ex: PETR4, VALE3, PETRD325, etc)
 4. strike: preço de exercício como número decimal. Para pernas "stock", use o preço unitário de compra/venda do ativo
 5. price: prêmio da opção como número decimal. Para pernas "stock", use 0
-6. quantity: quantidade inteira >= 1
+6. quantity: quantidade inteira >= 1 (o app interpretará o sinal pela side)
 
 DUPLA VERIFICAÇÃO: Conte quantas linhas a tabela da imagem possui. O número de pernas extraídas DEVE ser igual ao número de linhas. Se faltar alguma, revise.
 

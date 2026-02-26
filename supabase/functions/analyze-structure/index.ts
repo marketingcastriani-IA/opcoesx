@@ -5,6 +5,36 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const monthMapCalls = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"];
+const monthMapPuts = ["M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X"];
+
+const getExpiryMonth = (asset: string) => {
+  const letter = asset?.[4]?.toUpperCase() || "";
+  const callIdx = monthMapCalls.indexOf(letter);
+  if (callIdx >= 0) return callIdx + 1;
+  const putIdx = monthMapPuts.indexOf(letter);
+  if (putIdx >= 0) return putIdx + 1;
+  return null;
+};
+
+const getUnderlyingRoot = (asset: string) => {
+  const match = asset?.toUpperCase().match(/[A-Z]{4}/);
+  return match ? match[0] : asset?.slice(0, 4)?.toUpperCase();
+};
+
+const detectCollar = (legs: any[]) => {
+  const stock = legs.find((l) => l.option_type === "stock" && l.side === "buy");
+  const put = legs.find((l) => l.option_type === "put" && l.side === "buy");
+  const call = legs.find((l) => l.option_type === "call" && l.side === "sell");
+  if (!stock || !put || !call) return false;
+  const root = getUnderlyingRoot(stock.asset);
+  const putRoot = getUnderlyingRoot(put.asset);
+  const callRoot = getUnderlyingRoot(call.asset);
+  const putMonth = getExpiryMonth(put.asset);
+  const callMonth = getExpiryMonth(call.asset);
+  return root && root === putRoot && root === callRoot && putMonth && callMonth && putMonth === callMonth;
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -19,6 +49,9 @@ serve(async (req) => {
           .join("\n")
       : "Sem pernas";
 
+    const collarDetected = Array.isArray(legs) ? detectCollar(legs) : false;
+    const collarLabel = "Estratégia: Collar (Financiamento com Proteção)";
+
     const prompt = `Analise a estrutura abaixo e retorne uma avaliação curta e objetiva para decisão rápida.
 
 PERNAS:
@@ -31,6 +64,7 @@ MÉTRICAS:
 - Custo Líquido: R$ ${metrics.netCost}
 ${cdiRate ? `- CDI: ${cdiRate}% a.a.` : ""}
 ${daysToExpiry ? `- Dias até vencimento: ${daysToExpiry}` : ""}
+${collarDetected ? `\nCLASSIFICAÇÃO AUTOMÁTICA: ${collarLabel}` : ""}
 
 Retorne com foco em decisão: vale a pena montar a estrutura ou não, com justificativa resumida.`;
 
@@ -110,9 +144,11 @@ Retorne com foco em decisão: vale a pena montar a estrutura ou não, com justif
           ? "⛔ Não vale a pena"
           : "⚖️ Depende";
 
+    const structureLabel = collarDetected ? collarLabel : `Estrutura: ${parsed.structure_type}`;
+
     const suggestion = [
       `${verdictLabel}`,
-      `Estrutura: ${parsed.structure_type}`,
+      structureLabel,
       `Cenário: ${parsed.market_scenario}`,
       `Risco/Retorno: ${parsed.risk_return}`,
       parsed.cdi_vs_structure ? `CDI vs Estrutura: ${parsed.cdi_vs_structure}` : null,
@@ -127,9 +163,7 @@ Retorne com foco em decisão: vale a pena montar a estrutura ou não, com justif
   } catch (e) {
     console.error("analyze-structure error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
-

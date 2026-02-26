@@ -58,6 +58,7 @@ export type Database = {
           analysis_id: string
           asset: string
           created_at: string
+          current_price: number | null
           id: string
           option_type: string
           price: number
@@ -69,6 +70,7 @@ export type Database = {
           analysis_id: string
           asset: string
           created_at?: string
+          current_price?: number | null
           id?: string
           option_type: string
           price: number
@@ -80,6 +82,7 @@ export type Database = {
           analysis_id?: string
           asset?: string
           created_at?: string
+          current_price?: number | null
           id?: string
           option_type?: string
           price?: number

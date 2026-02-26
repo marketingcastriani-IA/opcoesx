@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
 import LegForm from '@/components/LegForm';
 import LegsTable from '@/components/LegsTable';
@@ -23,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [legs, setLegs] = useState<Leg[]>([]);
   const [analysisName, setAnalysisName] = useState('');
   const [cdiRate, setCdiRate] = useState(14.90);
@@ -141,6 +142,7 @@ export default function Dashboard() {
       if (lError) throw lError;
 
       toast.success('Análise salva com sucesso!');
+      navigate(`/analysis/${analysis.id}`);
     } catch (err: any) {
       toast.error('Erro ao salvar: ' + (err.message || 'Tente novamente'));
     } finally {

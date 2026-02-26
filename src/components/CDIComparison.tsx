@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { calculateCDIReturn } from '@/lib/payoff';
 import { AnalysisMetrics } from '@/lib/types';
-import { EXPIRY_OPTIONS } from '@/lib/b3-calendar';
+import { getExpiryOptions } from '@/lib/b3-calendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -36,6 +36,8 @@ export default function CDIComparison({ metrics, cdiRate, setCdiRate, daysToExpi
   const [applyIRCDI, setApplyIRCDI] = useState(false);
   const [applyIROptions, setApplyIROptions] = useState(false);
   const [expiryDate, setExpiryDate] = useState('');
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const expiryOptions = useMemo(() => getExpiryOptions(selectedYear), [selectedYear]);
 
   const isCollar = !!metrics.strategyType;
   const investedCapital = isCollar && metrics.montageTotal
@@ -112,13 +114,27 @@ export default function CDIComparison({ metrics, cdiRate, setCdiRate, daysToExpi
             <Input type="number" min={1} value={daysToExpiry || ''} onChange={e => setDaysToExpiry(parseInt(e.target.value) || 0)} placeholder="30" className="font-mono" />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Vencimento B3 2026</Label>
-            <Select value={expiryDate} onValueChange={handleExpiryChange}>
+            <Label className="text-xs">Ano</Label>
+            <Select value={String(selectedYear)} onValueChange={v => setSelectedYear(Number(v))}>
               <SelectTrigger className="h-9 text-xs">
-                <SelectValue placeholder="Selecione o vencimento" />
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {EXPIRY_OPTIONS.map(item => (
+                {[0, 1, 2].map(offset => {
+                  const y = new Date().getFullYear() + offset;
+                  return <SelectItem key={y} value={String(y)}>{y}</SelectItem>;
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Vencimento B3</Label>
+            <Select value={expiryDate} onValueChange={handleExpiryChange}>
+              <SelectTrigger className="h-9 text-xs">
+                <SelectValue placeholder="Selecione" />
+              </SelectTrigger>
+              <SelectContent>
+                {expiryOptions.map(item => (
                   <SelectItem key={item.date} value={item.date}>{item.label}</SelectItem>
                 ))}
               </SelectContent>

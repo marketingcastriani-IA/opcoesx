@@ -1,7 +1,8 @@
 import { AnalysisMetrics } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { TrendingUp, TrendingDown, Target, DollarSign, Percent } from 'lucide-react';
+import { TrendingUp, TrendingDown, Target, DollarSign, Percent, Shield } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Badge } from '@/components/ui/badge';
 
 interface MetricsCardsProps {
   metrics: AnalysisMetrics;
@@ -10,47 +11,78 @@ interface MetricsCardsProps {
 }
 
 export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsProps) {
-  const maxGainValue = metrics.maxGain === 'Ilimitado' ? null : Number(metrics.maxGain);
-  const maxLossValue = metrics.maxLoss === 'Ilimitado' ? null : Number(metrics.maxLoss);
-  const efficiency = cdiReturn > 0 && maxGainValue !== null
-    ? ((maxGainValue - cdiReturn) / cdiReturn) * 100
+  const isCollar = !!metrics.strategyType;
+  const montageValue = isCollar ? metrics.montageTotal ?? 0 : metrics.netCost;
+  const breakeven = isCollar && metrics.realBreakeven ? metrics.realBreakeven : null;
+
+  const maxGainValue = isCollar
+    ? (typeof metrics.maxGain === 'number' ? metrics.maxGain : null)
+    : (metrics.maxGain === 'Ilimitado' ? null : Number(metrics.maxGain));
+
+  const maxLossValue = isCollar
+    ? (typeof metrics.maxLoss === 'number' ? metrics.maxLoss : null)
+    : (metrics.maxLoss === 'Ilimitado' ? null : Number(metrics.maxLoss));
+
+  const efficiency = cdiReturn > 0 && maxGainValue !== null && maxGainValue > 0
+    ? (maxGainValue / cdiReturn) * 100
     : null;
 
   const items = [
     {
-      title: 'Custo Líquido',
-      value: `R$ ${metrics.netCost.toFixed(2)}`,
+      title: isCollar ? 'Custo de Montagem' : 'Custo Líquido',
+      value: `R$ ${montageValue.toFixed(2)}`,
       icon: DollarSign,
       color: 'text-muted-foreground',
-      tip: 'Valor líquido recebido (positivo) ou pago (negativo) ao montar a estrutura.',
+      tip: isCollar
+        ? 'Desembolso total: (Ativo + Put - Call) × Qtd'
+        : 'Valor líquido recebido (+) ou pago (-) ao montar a estrutura.',
+      badge: null as string | null,
     },
     {
       title: 'Lucro Máximo',
-      value: metrics.maxGain === 'Ilimitado' ? '∞' : `R$ ${Number(metrics.maxGain).toFixed(2)}`,
+      value: maxGainValue !== null ? `R$ ${maxGainValue.toFixed(2)}` : '∞',
       icon: TrendingUp,
       color: 'text-success',
-      tip: 'Maior lucro possível no vencimento, considerando todos os cenários de preço do ativo.',
+      tip: isCollar
+        ? '(Strike Call - Breakeven) × Qtd'
+        : 'Maior lucro possível no vencimento.',
+      badge: null,
     },
     {
       title: 'Risco Máximo',
-      value: metrics.maxLoss === 'Ilimitado' ? '∞' : `R$ ${Number(metrics.maxLoss).toFixed(2)}`,
-      icon: TrendingDown,
-      color: 'text-destructive',
-      tip: 'Maior prejuízo possível no vencimento. Valores positivos indicam perda absoluta.',
+      value: metrics.isRiskFree
+        ? 'R$ 0,00'
+        : (maxLossValue !== null ? `R$ ${maxLossValue.toFixed(2)}` : '∞'),
+      icon: metrics.isRiskFree ? Shield : TrendingDown,
+      color: metrics.isRiskFree ? 'text-success' : 'text-destructive',
+      tip: metrics.isRiskFree
+        ? 'Strike da Put > Breakeven: lucro garantido em qualquer cenário.'
+        : isCollar
+          ? '(Breakeven - Strike Put) × Qtd'
+          : 'Maior prejuízo possível no vencimento.',
+      badge: metrics.isRiskFree ? 'RISCO ZERO' : null,
     },
     {
-      title: 'Breakeven',
-      value: metrics.breakevens.length > 0 ? metrics.breakevens.map(b => `R$ ${b.toFixed(2)}`).join(' | ') : 'N/A',
+      title: isCollar ? 'Breakeven Real' : 'Breakeven',
+      value: breakeven
+        ? `R$ ${breakeven.toFixed(2)}`
+        : (metrics.breakevens.length > 0
+          ? metrics.breakevens.map(b => `R$ ${b.toFixed(2)}`).join(' | ')
+          : 'N/A'),
       icon: Target,
       color: 'text-warning',
-      tip: 'Preço do ativo onde a operação não dá lucro nem prejuízo.',
+      tip: isCollar
+        ? 'Custo Total de Montagem ÷ Quantidade'
+        : 'Preço do ativo onde a operação não dá lucro nem prejuízo.',
+      badge: null,
     },
     {
       title: 'Eficiência vs CDI',
-      value: efficiency === null ? 'N/A' : `${efficiency.toFixed(1)}%`,
+      value: efficiency !== null ? `${efficiency.toFixed(0)}% do CDI` : 'N/A',
       icon: Percent,
-      color: efficiency !== null && efficiency >= 0 ? 'text-success' : 'text-destructive',
-      tip: 'Comparativo entre o lucro máximo e o rendimento estimado do CDI no mesmo período.',
+      color: efficiency !== null && efficiency >= 100 ? 'text-success' : 'text-destructive',
+      tip: 'Lucro máximo da estrutura como % do rendimento CDI no mesmo período.',
+      badge: efficiency !== null && efficiency >= 100 ? 'VENCE O CDI' : null,
     },
   ];
 
@@ -66,6 +98,11 @@ export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsPro
               </CardHeader>
               <CardContent>
                 <p className={`text-lg font-bold font-mono ${item.color}`}>{item.value}</p>
+                {item.badge && (
+                  <Badge variant="default" className="mt-1 text-[10px] bg-success text-success-foreground">
+                    {item.badge}
+                  </Badge>
+                )}
               </CardContent>
             </Card>
           </TooltipTrigger>

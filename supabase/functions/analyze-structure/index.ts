@@ -5,36 +5,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const monthMapCalls = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L"];
-const monthMapPuts = ["M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X"];
-
-const getExpiryMonth = (asset: string) => {
-  const letter = asset?.[4]?.toUpperCase() || "";
-  const callIdx = monthMapCalls.indexOf(letter);
-  if (callIdx >= 0) return callIdx + 1;
-  const putIdx = monthMapPuts.indexOf(letter);
-  if (putIdx >= 0) return putIdx + 1;
-  return null;
-};
-
-const getUnderlyingRoot = (asset: string) => {
-  const match = asset?.toUpperCase().match(/[A-Z]{4}/);
-  return match ? match[0] : asset?.slice(0, 4)?.toUpperCase();
-};
-
-const detectCollar = (legs: any[]) => {
-  const stock = legs.find((l) => l.option_type === "stock" && l.side === "buy");
-  const put = legs.find((l) => l.option_type === "put" && l.side === "buy");
-  const call = legs.find((l) => l.option_type === "call" && l.side === "sell");
-  if (!stock || !put || !call) return false;
-  const root = getUnderlyingRoot(stock.asset);
-  const putRoot = getUnderlyingRoot(put.asset);
-  const callRoot = getUnderlyingRoot(call.asset);
-  const putMonth = getExpiryMonth(put.asset);
-  const callMonth = getExpiryMonth(call.asset);
-  return root && root === putRoot && root === callRoot && putMonth && callMonth && putMonth === callMonth;
-};
-
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -49,13 +19,26 @@ serve(async (req) => {
           .join("\n")
       : "Sem pernas";
 
-    const collarDetected = Array.isArray(legs) ? detectCollar(legs) : false;
-    const collarLabel = "Estratégia: Collar (Financiamento com Proteção)";
+    const isCollar = metrics?.strategyType === "Collar";
+    const collarInfo = isCollar
+      ? `\nESTRATÉGIA DETECTADA: Collar (Financiamento com Proteção)
+- Custo de Montagem: R$ ${metrics.montageTotal?.toFixed(2) || "N/A"}
+- Breakeven Real: R$ ${metrics.realBreakeven?.toFixed(2) || "N/A"}
+- Risco Zero: ${metrics.isRiskFree ? "SIM (Put > Breakeven)" : "NÃO"}`
+      : "";
 
-    const prompt = `Analise a estrutura abaixo e retorne uma avaliação curta e objetiva para decisão rápida.
+    const cdiInfo = metrics?.cdiReturn
+      ? `\n- Retorno CDI no período: R$ ${metrics.cdiReturn.toFixed(2)}`
+      : "";
+    const efficiencyInfo = metrics?.cdiEfficiency
+      ? `\n- Eficiência vs CDI: ${metrics.cdiEfficiency}%`
+      : "";
+
+    const prompt = `Analise esta estrutura de opções e dê um veredito objetivo.
 
 PERNAS:
 ${legsDescription}
+${collarInfo}
 
 MÉTRICAS:
 - Ganho Máximo: ${metrics.maxGain === "Ilimitado" ? "Ilimitado" : "R$ " + metrics.maxGain}
@@ -63,10 +46,9 @@ MÉTRICAS:
 - Breakevens: ${metrics.breakevens?.length ? metrics.breakevens.map((b: number) => "R$ " + b.toFixed(2)).join(", ") : "N/A"}
 - Custo Líquido: R$ ${metrics.netCost}
 ${cdiRate ? `- CDI: ${cdiRate}% a.a.` : ""}
-${daysToExpiry ? `- Dias até vencimento: ${daysToExpiry}` : ""}
-${collarDetected ? `\nCLASSIFICAÇÃO AUTOMÁTICA: ${collarLabel}` : ""}
+${daysToExpiry ? `- Dias úteis: ${daysToExpiry}` : ""}${cdiInfo}${efficiencyInfo}
 
-Retorne com foco em decisão: vale a pena montar a estrutura ou não, com justificativa resumida.`;
+Responda em no máximo 3 linhas: veredito + justificativa.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -79,8 +61,7 @@ Retorne com foco em decisão: vale a pena montar a estrutura ou não, com justif
         messages: [
           {
             role: "system",
-            content:
-              "Você é analista de opções do mercado brasileiro. Seja extremamente objetivo. Evite texto longo. Entregue veredito claro para ação.",
+            content: "Você é analista quantitativo de opções do mercado brasileiro. Seja extremamente objetivo. Máximo 3 linhas.",
           },
           { role: "user", content: prompt },
         ],
@@ -98,6 +79,7 @@ Retorne com foco em decisão: vale a pena montar a estrutura ou não, com justif
                   market_scenario: { type: "string" },
                   risk_return: { type: "string" },
                   cdi_vs_structure: { type: "string" },
+                  cdi_efficiency: { type: "number", description: "% do CDI (ex: 166)" },
                   summary: { type: "string" },
                 },
                 required: ["verdict", "structure_type", "market_scenario", "risk_return", "summary"],
@@ -113,14 +95,12 @@ Retorne com foco em decisão: vale a pena montar a estrutura ou não, com justif
     if (!response.ok) {
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limit exceeded." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (response.status === 402) {
         return new Response(JSON.stringify({ error: "Payment required." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       throw new Error("AI gateway error");
@@ -144,14 +124,13 @@ Retorne com foco em decisão: vale a pena montar a estrutura ou não, com justif
           ? "⛔ Não vale a pena"
           : "⚖️ Depende";
 
-    const structureLabel = collarDetected ? collarLabel : `Estrutura: ${parsed.structure_type}`;
-
     const suggestion = [
-      `${verdictLabel}`,
-      structureLabel,
+      verdictLabel,
+      isCollar ? `Estratégia: Collar (Financiamento com Proteção)` : `Estrutura: ${parsed.structure_type}`,
       `Cenário: ${parsed.market_scenario}`,
       `Risco/Retorno: ${parsed.risk_return}`,
       parsed.cdi_vs_structure ? `CDI vs Estrutura: ${parsed.cdi_vs_structure}` : null,
+      parsed.cdi_efficiency ? `Eficiência: ${parsed.cdi_efficiency}% do CDI` : null,
       `Resumo: ${parsed.summary}`,
     ]
       .filter(Boolean)

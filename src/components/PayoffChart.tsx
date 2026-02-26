@@ -9,6 +9,7 @@ interface PayoffChartProps {
   cdiRate?: number;
   daysToExpiry?: number;
   netCost?: number;
+  montageTotal?: number;
 }
 
 const chartConfig = {
@@ -19,10 +20,10 @@ const chartConfig = {
   cdiReturn: { label: 'CDI', color: 'hsl(45 95% 55%)' },
 };
 
-export default function PayoffChart({ data, breakevens, cdiRate = 0, daysToExpiry = 0, netCost = 0 }: PayoffChartProps) {
+export default function PayoffChart({ data, breakevens, cdiRate = 0, daysToExpiry = 0, netCost = 0, montageTotal }: PayoffChartProps) {
   if (data.length === 0) return null;
 
-  const investedCapital = Math.max(Math.abs(netCost || 0), 1);
+  const investedCapital = Math.max(Math.abs(montageTotal ?? netCost ?? 0), 1);
   const cdiValue = cdiRate > 0 && daysToExpiry > 0
     ? calculateCDIReturn(investedCapital, cdiRate, daysToExpiry, false)
     : null;

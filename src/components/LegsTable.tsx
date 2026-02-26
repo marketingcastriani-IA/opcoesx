@@ -52,11 +52,12 @@ export default function LegsTable({ legs, onRemove, onUpdate }: LegsTableProps) 
               <TableCell>
                 <select
                   value={leg.option_type}
-                  onChange={(e) => updateField(i, 'option_type', e.target.value as 'call' | 'put')}
+                  onChange={(e) => updateField(i, 'option_type', e.target.value as 'call' | 'put' | 'stock')}
                   className="h-8 rounded-md border border-input bg-background px-2 text-xs"
                 >
                   <option value="call">Call</option>
                   <option value="put">Put</option>
+                  <option value="stock">Ativo</option>
                 </select>
               </TableCell>
               <TableCell>

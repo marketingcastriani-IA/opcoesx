@@ -4,13 +4,18 @@ export function calculatePayoffAtExpiry(legs: Leg[], spotPrice: number): number 
   let total = 0;
   for (const leg of legs) {
     const multiplier = leg.side === 'buy' ? 1 : -1;
-    let intrinsic = 0;
-    if (leg.option_type === 'call') {
-      intrinsic = Math.max(0, spotPrice - leg.strike);
+    if (leg.option_type === 'stock') {
+      // Stock/ativo-objeto: payoff = (spot - purchase_price) * qty
+      total += multiplier * (spotPrice - leg.strike) * leg.quantity;
     } else {
-      intrinsic = Math.max(0, leg.strike - spotPrice);
+      let intrinsic = 0;
+      if (leg.option_type === 'call') {
+        intrinsic = Math.max(0, spotPrice - leg.strike);
+      } else {
+        intrinsic = Math.max(0, leg.strike - spotPrice);
+      }
+      total += multiplier * (intrinsic - leg.price) * leg.quantity;
     }
-    total += multiplier * (intrinsic - leg.price) * leg.quantity;
   }
   return total;
 }

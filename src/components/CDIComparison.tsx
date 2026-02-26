@@ -130,16 +130,31 @@ export default function CDIComparison({ metrics, cdiRate, setCdiRate, daysToExpi
             </div>
 
             {comparison && (
-              <div className="rounded-lg border bg-muted/40 p-3 space-y-1">
-                <p className="text-sm">
-                  Diferença para CDI:{' '}
-                  <span className={`font-semibold ${comparison.optionBetter ? 'text-success' : 'text-foreground'}`}>
-                    {Number.isFinite(comparison.spread)
-                      ? `${comparison.spread >= 0 ? '+' : '-'}${formatMoney(Math.abs(comparison.spread))}`
-                      : 'Acima do CDI (potencial ilimitado)'}
-                  </span>
-                </p>
-                <p className="text-sm text-muted-foreground">Veredito: {comparison.verdict}</p>
+              <div className="rounded-lg border bg-muted/40 p-4 space-y-3">
+                {/* Highlight % difference */}
+                <div className="text-center">
+                  {optionRoi !== null && Number.isFinite(optionRoi) ? (
+                    <div className={`text-3xl font-extrabold ${optionRoi - cdiRoi >= 0 ? 'text-success' : 'text-destructive'}`}>
+                      {optionRoi - cdiRoi >= 0 ? '+' : ''}{(optionRoi - cdiRoi).toFixed(2)}%
+                      <span className="text-sm font-medium ml-1">vs CDI</span>
+                    </div>
+                  ) : (
+                    <div className="text-3xl font-extrabold text-success">
+                      ∞ <span className="text-sm font-medium ml-1">potencial ilimitado vs CDI</span>
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Estrutura: {optionRoi !== null ? `${optionRoi.toFixed(2)}%` : '∞'} ROI | CDI: {cdiRoi.toFixed(2)}% ROI
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm text-muted-foreground">
+                    Diferença: {Number.isFinite(comparison.spread)
+                      ? `${comparison.spread >= 0 ? '+' : ''}${formatMoney(comparison.spread)}`
+                      : 'Acima do CDI'}
+                  </p>
+                  <p className="text-sm font-medium mt-1">{comparison.verdict}</p>
+                </div>
               </div>
             )}
           </div>

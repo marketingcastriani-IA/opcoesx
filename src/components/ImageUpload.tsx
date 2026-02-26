@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Upload, Loader2 } from 'lucide-react';
+import { Upload, Loader2, X } from 'lucide-react';
 import { Leg } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -113,7 +113,20 @@ export default function ImageUpload({ onLegsExtracted }: ImageUploadProps) {
           </>
         ) : preview ? (
           <>
-            <img src={preview} alt="Preview da imagem enviada" className="max-h-32 rounded-lg object-contain" loading="lazy" />
+            <div className="relative">
+              <img src={preview} alt="Preview da imagem enviada" className="max-h-32 rounded-lg object-contain" loading="lazy" />
+              <button
+                type="button"
+                className="absolute -top-2 -right-2 rounded-full bg-destructive p-1 text-destructive-foreground shadow-sm hover:bg-destructive/90"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setPreview(null);
+                  if (fileInputRef.current) fileInputRef.current.value = '';
+                }}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
             <p className="text-xs text-muted-foreground">Cole (Ctrl+V), arraste ou clique para substituir</p>
           </>
         ) : (

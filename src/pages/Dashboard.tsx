@@ -23,7 +23,7 @@ export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
   const [legs, setLegs] = useState<Leg[]>([]);
   const [analysisName, setAnalysisName] = useState('');
-  const [cdiRate, setCdiRate] = useState(0);
+  const [cdiRate, setCdiRate] = useState(14.90);
   const [daysToExpiry, setDaysToExpiry] = useState(0);
   const [aiSuggestion, setAiSuggestion] = useState('');
   const [loadingAI, setLoadingAI] = useState(false);
@@ -161,7 +161,7 @@ export default function Dashboard() {
             <Card>
               <CardHeader><CardTitle className="text-base">Gráfico de Payoff</CardTitle></CardHeader>
               <CardContent>
-                <PayoffChart data={payoffData} breakevens={metrics.breakevens} />
+                <PayoffChart data={payoffData} breakevens={metrics.breakevens} cdiRate={cdiRate} daysToExpiry={daysToExpiry} netCost={metrics.netCost} />
               </CardContent>
             </Card>
             <CDIComparison metrics={metrics} cdiRate={cdiRate} setCdiRate={setCdiRate} daysToExpiry={daysToExpiry} setDaysToExpiry={setDaysToExpiry} />

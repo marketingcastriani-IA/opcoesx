@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface CDIComparisonProps {
   metrics: AnalysisMetrics;
@@ -16,9 +17,39 @@ interface CDIComparisonProps {
 
 const formatMoney = (value: number) => `R$ ${value.toFixed(2)}`;
 
+const expiryCalendar2026 = [
+  { label: 'Jan 2026 (16/01)', date: '2026-01-16' },
+  { label: 'Fev 2026 (20/02)', date: '2026-02-20' },
+  { label: 'Mar 2026 (20/03)', date: '2026-03-20' },
+  { label: 'Abr 2026 (17/04)', date: '2026-04-17' },
+  { label: 'Mai 2026 (15/05)', date: '2026-05-15' },
+  { label: 'Jun 2026 (19/06)', date: '2026-06-19' },
+  { label: 'Jul 2026 (17/07)', date: '2026-07-17' },
+  { label: 'Ago 2026 (21/08)', date: '2026-08-21' },
+  { label: 'Set 2026 (18/09)', date: '2026-09-18' },
+  { label: 'Out 2026 (16/10)', date: '2026-10-16' },
+  { label: 'Nov 2026 (19/11)', date: '2026-11-19' },
+  { label: 'Dez 2026 (18/12)', date: '2026-12-18' },
+];
+
+const parseDate = (value: string) => {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
+const calculateDaysToExpiry = (value: string) => {
+  if (!value) return 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = parseDate(value);
+  const diff = Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  return diff > 0 ? diff : 0;
+};
+
 export default function CDIComparison({ metrics, cdiRate, setCdiRate, daysToExpiry, setDaysToExpiry }: CDIComparisonProps) {
   const [applyIRCDI, setApplyIRCDI] = useState(false);
   const [applyIROptions, setApplyIROptions] = useState(false);
+  const [expiryDate, setExpiryDate] = useState('');
 
   const investedCapital = Math.max(Math.abs(metrics.netCost), 100);
   const cdiReturn = calculateCDIReturn(investedCapital, cdiRate, daysToExpiry, applyIRCDI);
@@ -61,13 +92,18 @@ export default function CDIComparison({ metrics, cdiRate, setCdiRate, daysToExpi
   const cdiRoi = investedCapital > 0 ? (cdiReturn / investedCapital) * 100 : 0;
   const optionRoi = Number.isFinite(optionMaxGain) && investedCapital > 0 ? (optionMaxGain / investedCapital) * 100 : null;
 
+  const handleExpiryChange = (value: string) => {
+    setExpiryDate(value);
+    setDaysToExpiry(calculateDaysToExpiry(value));
+  };
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Comparativo completo: Estratégia vs CDI</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-1">
             <Label className="text-xs">Taxa CDI (% a.a.)</Label>
             <Input type="number" step="0.01" value={cdiRate || ''} onChange={e => setCdiRate(parseFloat(e.target.value) || 0)} placeholder="13.65" />
@@ -75,6 +111,20 @@ export default function CDIComparison({ metrics, cdiRate, setCdiRate, daysToExpi
           <div className="space-y-1">
             <Label className="text-xs">Dias até vencimento</Label>
             <Input type="number" min={1} value={daysToExpiry || ''} onChange={e => setDaysToExpiry(parseInt(e.target.value) || 0)} placeholder="30" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Data de vencimento</Label>
+            <Input type="date" value={expiryDate} onChange={e => handleExpiryChange(e.target.value)} />
+            <Select value={expiryDate} onValueChange={handleExpiryChange}>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="Atalho vencimentos 2026" />
+              </SelectTrigger>
+              <SelectContent>
+                {expiryCalendar2026.map(item => (
+                  <SelectItem key={item.date} value={item.date}>{item.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Capital base da comparação</Label>
@@ -163,4 +213,3 @@ export default function CDIComparison({ metrics, cdiRate, setCdiRate, daysToExpi
     </Card>
   );
 }
-

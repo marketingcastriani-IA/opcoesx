@@ -112,7 +112,7 @@ export default function Index() {
               Calendário B3 atualizado
             </div>
             <span className="text-border">|</span>
-            <div>OCR para BTG, Profit e mais</div>
+            <div>OCR para Bolsa de Valores e Derivativos</div>
             <span className="text-border hidden sm:inline">|</span>
             <div className="hidden sm:block">100% gratuito</div>
           </div>

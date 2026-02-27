@@ -198,7 +198,7 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Tire um <strong className="text-foreground">print da sua corretora</strong> (BTG, Profit, Clear) e a IA extrai automaticamente todas as pernas.
+                  Tire um <strong className="text-foreground">print da sua corretora</strong> (Bolsa de Valores e Derivativos) e a IA extrai automaticamente todas as pernas.
                 </p>
                 <div className="flex items-center gap-2 text-primary text-sm font-medium">
                   Começar com imagem <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />

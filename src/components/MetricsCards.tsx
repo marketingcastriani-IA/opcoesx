@@ -3,6 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { TrendingUp, TrendingDown, Target, DollarSign, Percent, Shield } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 interface MetricsCardsProps {
   metrics: AnalysisMetrics;
@@ -17,32 +18,26 @@ export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsPro
   const isBullCallSpread = metrics.strategyType === 'BullCallSpread';
   const isBearPutSpread = metrics.strategyType === 'BearPutSpread';
 
-  // Custo de montagem: para estratégias detectadas usa montageTotal, senão netCost
   const montageValue = hasStrategy
     ? (metrics.montageTotal ?? metrics.netCost)
     : metrics.netCost;
 
-  // Breakeven: usa o breakeven real da estratégia se disponível
   const breakeven = hasStrategy && metrics.realBreakeven != null
     ? (Array.isArray(metrics.realBreakeven) ? metrics.realBreakeven : [metrics.realBreakeven])
     : null;
 
-  // Lucro máximo
   const maxGainValue = metrics.maxGain === 'Ilimitado'
     ? null
     : (typeof metrics.maxGain === 'number' ? metrics.maxGain : null);
 
-  // Risco máximo
   const maxLossValue = metrics.maxLoss === 'Ilimitado'
     ? null
     : (typeof metrics.maxLoss === 'number' ? metrics.maxLoss : null);
 
-  // Eficiência vs CDI
   const efficiency = cdiReturn > 0 && maxGainValue !== null && maxGainValue > 0
     ? (maxGainValue / cdiReturn) * 100
     : null;
 
-  // Rótulos dinâmicos por estratégia
   const costLabel = isCoveredCall || isCollar || isBullCallSpread || isBearPutSpread
     ? 'Custo de Montagem'
     : 'Custo Líquido';
@@ -58,7 +53,7 @@ export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsPro
           : 'Valor líquido recebido (+) ou pago (-) ao montar a estrutura.';
 
   const maxGainTip = isCoveredCall
-    ? '(Strike Call - Breakeven) × Qtd — ganho limitado pelo strike da call vendida'
+    ? '(Strike Call - Breakeven) × Qtd'
     : isCollar
       ? '(Strike Call - Breakeven) × Qtd'
       : isBullCallSpread
@@ -81,7 +76,7 @@ export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsPro
 
   const breakevenLabel = hasStrategy ? 'Breakeven Real' : 'Breakeven';
   const breakevenTip = isCoveredCall
-    ? 'Preço do ativo onde a operação não dá lucro nem prejuízo: Custo de Montagem ÷ Qtd'
+    ? 'Preço do ativo onde a operação não dá lucro nem prejuízo'
     : isCollar
       ? 'Custo Total de Montagem ÷ Quantidade'
       : isBullCallSpread
@@ -90,40 +85,68 @@ export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsPro
           ? 'Strike da Put Comprada - Débito Líquido por ação'
           : 'Preço do ativo onde a operação não dá lucro nem prejuízo.';
 
-  // Removido: extração de preço do ativo (não disponível em AnalysisMetrics)
-  const assetPrice = 0;
-  const assetName = '';
+  type CardTheme = 'blue' | 'green' | 'red' | 'yellow' | 'white' | 'purple';
 
-  const items = [
-    ...(assetPrice > 0 ? [{
-      title: `PRECO DO ATIVO (${assetName})`,
-      value: `R$ ${assetPrice.toFixed(2)}`,
-      icon: DollarSign,
-      color: 'text-primary',
-      glowColor: 'shadow-[0_0_30px_-8px_hsl(var(--primary)/0.4)]',
-      tip: `Preco unitario da acao ${assetName} na montagem da estrutura.`,
-      badge: 'BASE',
-      badgeColor: 'bg-primary/25 text-primary border-primary/40',
-    }] : []),
+  const themeClasses: Record<CardTheme, { card: string; icon: string; text: string; badge: string }> = {
+    blue: {
+      card: 'border-info/30 bg-gradient-to-br from-info/10 via-card to-card hover:border-info/50 hover:shadow-[0_0_30px_-8px_hsl(var(--info)/0.35)]',
+      icon: 'bg-info/15 text-info',
+      text: 'text-info',
+      badge: 'bg-info/20 text-info border-info/40',
+    },
+    green: {
+      card: 'border-success/30 bg-gradient-to-br from-success/10 via-card to-card hover:border-success/50 hover:shadow-[0_0_30px_-8px_hsl(var(--success)/0.35)]',
+      icon: 'bg-success/15 text-success',
+      text: 'text-success',
+      badge: 'bg-success text-success-foreground',
+    },
+    red: {
+      card: 'border-destructive/30 bg-gradient-to-br from-destructive/10 via-card to-card hover:border-destructive/50 hover:shadow-[0_0_30px_-8px_hsl(var(--destructive)/0.35)]',
+      icon: 'bg-destructive/15 text-destructive',
+      text: 'text-destructive',
+      badge: 'bg-destructive text-destructive-foreground',
+    },
+    yellow: {
+      card: 'border-warning/30 bg-gradient-to-br from-warning/10 via-card to-card hover:border-warning/50 hover:shadow-[0_0_30px_-8px_hsl(var(--warning)/0.35)]',
+      icon: 'bg-warning/15 text-warning',
+      text: 'text-warning',
+      badge: 'bg-warning text-warning-foreground',
+    },
+    white: {
+      card: 'border-border/50 bg-gradient-to-br from-foreground/5 via-card to-card hover:border-border hover:shadow-[0_0_30px_-8px_hsl(var(--foreground)/0.15)]',
+      icon: 'bg-muted text-muted-foreground',
+      text: 'text-muted-foreground',
+      badge: 'bg-muted text-muted-foreground',
+    },
+    purple: {
+      card: 'border-accent/30 bg-gradient-to-br from-accent/10 via-card to-card hover:border-accent/50 hover:shadow-[0_0_30px_-8px_hsl(var(--accent)/0.35)]',
+      icon: 'bg-accent/15 text-accent',
+      text: 'text-accent',
+      badge: 'bg-accent/20 text-accent border-accent/40',
+    },
+  };
+
+  const items: {
+    title: string;
+    value: string;
+    icon: typeof DollarSign;
+    theme: CardTheme;
+    tip: string;
+    badge?: string | null;
+  }[] = [
     {
       title: costLabel,
       value: `R$ ${Math.abs(montageValue).toFixed(2)}`,
       icon: DollarSign,
-      color: 'text-muted-foreground',
-      glowColor: '',
+      theme: 'white',
       tip: costTip,
-      badge: null as string | null,
-      badgeColor: '',
     },
     {
       title: 'Lucro Máximo',
       value: maxGainValue !== null ? `R$ ${maxGainValue.toFixed(2)}` : '∞',
       icon: TrendingUp,
-      color: 'text-success',
-      glowColor: 'shadow-[0_0_20px_-4px_hsl(var(--success)/0.3)]',
+      theme: 'green',
       tip: maxGainTip,
-      badge: null,
-      badgeColor: '',
     },
     {
       title: 'Risco Máximo',
@@ -131,13 +154,9 @@ export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsPro
         ? 'R$ 0,00'
         : (maxLossValue !== null ? `R$ ${Math.abs(maxLossValue).toFixed(2)}` : '∞'),
       icon: metrics.isRiskFree ? Shield : TrendingDown,
-      color: metrics.isRiskFree ? 'text-success' : 'text-destructive',
-      glowColor: metrics.isRiskFree
-        ? 'shadow-[0_0_20px_-4px_hsl(var(--success)/0.3)]'
-        : 'shadow-[0_0_20px_-4px_hsl(var(--destructive)/0.3)]',
+      theme: metrics.isRiskFree ? 'green' : 'red',
       tip: maxLossTip,
       badge: metrics.isRiskFree ? 'RISCO ZERO' : null,
-      badgeColor: 'bg-success text-success-foreground',
     },
     {
       title: breakevenLabel,
@@ -147,54 +166,50 @@ export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsPro
           ? metrics.breakevens.map(b => `R$ ${b.toFixed(2)}`).join(' | ')
           : 'N/A'),
       icon: Target,
-      color: 'text-warning',
-      glowColor: 'shadow-[0_0_20px_-4px_hsl(var(--warning)/0.3)]',
+      theme: 'yellow',
       tip: breakevenTip,
-      badge: null,
-      badgeColor: '',
     },
     {
       title: 'Eficiência vs CDI',
       value: efficiency !== null ? `${efficiency.toFixed(0)}%` : 'N/A',
       icon: Percent,
-      color: efficiency !== null && efficiency >= 100 ? 'text-success' : 'text-destructive',
-      glowColor: efficiency !== null && efficiency >= 100
-        ? 'shadow-[0_0_20px_-4px_hsl(var(--success)/0.3)]'
-        : '',
+      theme: efficiency !== null && efficiency >= 100 ? 'blue' : 'purple',
       tip: 'Lucro máximo da estrutura como % do rendimento CDI no mesmo período.',
       badge: efficiency !== null && efficiency >= 100 ? 'VENCE O CDI' : null,
-      badgeColor: 'bg-success text-success-foreground',
     },
   ];
 
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-      {items.map(item => (
-        <Tooltip key={item.title}>
-          <TooltipTrigger asChild>
-            <Card className={`cursor-help group relative overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:border-primary/40 bg-card/50 backdrop-blur-sm border-border/40 ${item.glowColor}`}>
-              {/* Subtle gradient overlay */}
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.03] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              
-              <CardContent className="relative p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{item.title}</span>
-                  <div className={`flex h-8 w-8 items-center justify-center rounded-lg bg-muted/50 ${item.color} transition-colors group-hover:bg-muted`}>
-                    <item.icon className="h-4 w-4" />
+      {items.map(item => {
+        const t = themeClasses[item.theme];
+        return (
+          <Tooltip key={item.title}>
+            <TooltipTrigger asChild>
+              <Card className={cn(
+                'cursor-help group relative overflow-hidden transition-all duration-300 hover:scale-[1.02]',
+                t.card
+              )}>
+                <CardContent className="relative p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{item.title}</span>
+                    <div className={cn('flex h-8 w-8 items-center justify-center rounded-lg transition-colors', t.icon)}>
+                      <item.icon className="h-4 w-4" />
+                    </div>
                   </div>
-                </div>
-                <p className={`text-xl font-bold font-mono tracking-tight ${item.color}`}>{item.value}</p>
-                {item.badge && (
-                  <Badge className={`mt-2 text-[10px] font-semibold tracking-wider animate-pulse ${item.badgeColor}`}>
-                    {item.badge}
-                  </Badge>
-                )}
-              </CardContent>
-            </Card>
-          </TooltipTrigger>
-          <TooltipContent className="max-w-[250px]"><p>{item.tip}</p></TooltipContent>
-        </Tooltip>
-      ))}
+                  <p className={cn('text-xl font-bold font-mono tracking-tight', t.text)}>{item.value}</p>
+                  {item.badge && (
+                    <Badge className={cn('mt-2 text-[10px] font-semibold tracking-wider animate-pulse', t.badge)}>
+                      {item.badge}
+                    </Badge>
+                  )}
+                </CardContent>
+              </Card>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-[250px]"><p>{item.tip}</p></TooltipContent>
+          </Tooltip>
+        );
+      })}
     </div>
   );
 }

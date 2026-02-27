@@ -26,6 +26,10 @@
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
+    --info: 210 100% 52%;
+    --info-foreground: 0 0% 100%;
+    --highlight: 48 96% 53%;
+    --highlight-foreground: 0 0% 10%;
     --border: 220 13% 90%;
     --input: 220 13% 90%;
     --ring: 152 80% 45%;
@@ -64,6 +68,10 @@
     --success-foreground: 0 0% 6%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 6%;
+    --info: 210 100% 56%;
+    --info-foreground: 0 0% 100%;
+    --highlight: 48 96% 53%;
+    --highlight-foreground: 0 0% 6%;
     --border: 0 0% 19%;
     --input: 0 0% 19%;
     --ring: 152 100% 50%;

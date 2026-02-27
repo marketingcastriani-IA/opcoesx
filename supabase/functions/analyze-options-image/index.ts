@@ -57,7 +57,6 @@ const normalizeOptionType = (value?: string, asset?: string) => {
 const validateAsset = (asset?: string): string | null => {
   if (!asset) return null;
   const cleaned = asset.trim().toUpperCase();
-  // B3 tickers: 4-5 chars for stocks (PETR4, VALE3), 5-8 chars for options (PETRA1, PETRC405, PETRO405)
   if (/^[A-Z]{3,6}[A-Z0-9]{1,4}$/.test(cleaned) && cleaned.length >= 4 && cleaned.length <= 10) {
     return cleaned;
   }
@@ -95,31 +94,14 @@ const normalizeLegs = (legs: RawLeg[] | undefined) => {
 
       if (optionType === "stock") {
         let assetPrice = 0;
-
-        if (priceRaw > 0) {
-          console.log(`Leg ${idx}: Preço encontrado no campo PRICE: ${priceRaw}`);
-          assetPrice = priceRaw;
-        } else if (strikeRaw > 0) {
-          console.log(`Leg ${idx}: Preço encontrado no campo STRIKE: ${strikeRaw}`);
-          assetPrice = strikeRaw;
-        } else {
-          if (leg.price && typeof leg.price === "string") {
-            const extracted = toNumber(leg.price);
-            if (extracted > 0) assetPrice = extracted;
-          }
-          if (assetPrice === 0 && leg.strike && typeof leg.strike === "string") {
-            const extracted = toNumber(leg.strike);
-            if (extracted > 0) assetPrice = extracted;
-          }
-        }
-
-        // Se o preço não foi encontrado, permitir 0 (será preenchido depois pelo usuário)
+        if (priceRaw > 0) assetPrice = priceRaw;
+        else if (strikeRaw > 0) assetPrice = strikeRaw;
+        
         if (assetPrice > 0 && (assetPrice < 0.01 || assetPrice > 10000)) {
           console.error(`Leg ${idx}: Preço de ativo fora do intervalo: ${assetPrice}`);
           return null;
         }
 
-        console.log(`Leg ${idx}: Ativo ${asset} com preço ${assetPrice || 'não encontrado - será preenchido depois'}`);
         strike = assetPrice > 0 ? assetPrice : 0;
         price = assetPrice > 0 ? assetPrice : 0;
       } else {
@@ -148,6 +130,159 @@ const normalizeLegs = (legs: RawLeg[] | undefined) => {
     .filter(Boolean);
 };
 
+const SYSTEM_PROMPT = `Você é um especialista em leitura de screenshots de plataformas brasileiras de opções (Clear, XP, BTG, Profit Pro, Rico, Inter, etc).
+
+MISSÃO: Extrair TODAS as pernas (legs) de uma operação estruturada de opções.
+
+Cada LINHA da tabela = UMA perna. Extraia TODAS.
+
+## CAMPOS:
+- **side**: "C"/"Compra" → "buy", "V"/"Venda" → "sell". Verde/Azul=buy, Vermelho=sell
+- **option_type**: ticker 5+ chars com letra na 5ª posição = opção (A-L=call, M-X=put). Ticker 4-5 chars = "stock"
+- **asset**: copie EXATAMENTE como aparece
+- **strike**: preço de exercício (opções) ou preço atual (stock). NUNCA zero para stock!
+- **price**: prêmio (opções) ou 0 (stock)
+- **quantity**: geralmente 100
+
+## EXEMPLO:
+| C | PETR4 | - | 39.55 | 100 | → side=buy, option_type=stock, asset=PETR4, strike=39.55, price=0, quantity=100
+| C | - | PETRP396 | 39.65 | 1.50 | 100 | → side=buy, option_type=put, asset=PETRP396, strike=39.65, price=1.50, quantity=100
+| V | - | Call | PETRD399 | 39.90 | 1.93 | 100 | → side=sell, option_type=call, asset=PETRD399, strike=39.90, price=1.93, quantity=100
+
+REGRA CRÍTICA: Número de pernas = número de linhas na tabela.`;
+
+const USER_PROMPT = "Extraia TODAS as pernas desta operação estruturada. Leia cada linha da tabela com máxima atenção. Retorne os dados estruturados.";
+
+async function callAI(apiKey: string, imageUrl: string, useToolCalls: boolean): Promise<{ legs?: RawLeg[]; total_rows_in_image?: number } | null> {
+  const body: any = {
+    model: "google/gemini-2.5-flash",
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: useToolCalls ? USER_PROMPT : USER_PROMPT + '\n\nResponda SOMENTE com JSON no formato: {"legs": [...], "total_rows_in_image": N}. Cada leg: {"side":"buy"|"sell","option_type":"call"|"put"|"stock","asset":"TICKER","strike":NUMBER,"price":NUMBER,"quantity":NUMBER}' },
+          { type: "image_url", image_url: { url: imageUrl } },
+        ],
+      },
+    ],
+  };
+
+  if (useToolCalls) {
+    body.tools = [
+      {
+        type: "function",
+        function: {
+          name: "extract_legs",
+          description: "Extrai todas as pernas de uma operação estruturada de opções",
+          parameters: {
+            type: "object",
+            properties: {
+              legs: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    side: { type: "string", enum: ["buy", "sell"] },
+                    option_type: { type: "string", enum: ["call", "put", "stock"] },
+                    asset: { type: "string" },
+                    strike: { type: "number" },
+                    price: { type: "number" },
+                    quantity: { type: "number" },
+                  },
+                  required: ["side", "option_type", "asset", "strike", "price", "quantity"],
+                },
+              },
+              total_rows_in_image: { type: "number" },
+            },
+            required: ["legs", "total_rows_in_image"],
+          },
+        },
+      },
+    ];
+    body.tool_choice = { type: "function", function: { name: "extract_legs" } };
+  }
+
+  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const status = response.status;
+    const text = await response.text();
+    console.error(`AI gateway error (${status}):`, text);
+    if (status === 429 || status === 402) throw { status, message: text };
+    throw new Error(`AI gateway error: ${status}`);
+  }
+
+  const result = await response.json();
+  const msg = result.choices?.[0]?.message;
+  
+  console.log("AI attempt debug:", JSON.stringify({
+    useToolCalls,
+    hasToolCalls: !!msg?.tool_calls,
+    toolCallsCount: msg?.tool_calls?.length,
+    contentType: typeof msg?.content,
+    contentLength: typeof msg?.content === "string" ? msg.content.length : -1,
+    contentPreview: typeof msg?.content === "string" ? msg.content.substring(0, 300) : "non-string",
+    finishReason: result.choices?.[0]?.finish_reason,
+  }));
+
+  // Try tool_calls
+  if (msg?.tool_calls?.[0]?.function?.arguments) {
+    try {
+      const args = msg.tool_calls[0].function.arguments;
+      const parsed = typeof args === "string" ? JSON.parse(args) : args;
+      if (parsed?.legs?.length > 0) {
+        console.log("✓ Extracted from tool_calls:", parsed.legs.length, "legs");
+        return parsed;
+      }
+    } catch (e) { console.warn("Failed to parse tool_calls:", e); }
+  }
+
+  // Try text content
+  let textContent = "";
+  if (typeof msg?.content === "string") {
+    textContent = msg.content;
+  } else if (Array.isArray(msg?.content)) {
+    textContent = msg.content.filter((p: any) => p.type === "text").map((p: any) => p.text).join("\n");
+  }
+
+  if (textContent) {
+    // Try to find JSON with legs array
+    const jsonMatch = textContent.match(/\{[\s\S]*?"legs"\s*:\s*\[[\s\S]*?\][\s\S]*?\}/);
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (parsed?.legs?.length > 0) {
+          console.log("✓ Extracted from text content:", parsed.legs.length, "legs");
+          return parsed;
+        }
+      } catch { 
+        // Try cleaning markdown code blocks
+        const cleaned = textContent.replace(/```json?\s*/g, "").replace(/```/g, "").trim();
+        const match2 = cleaned.match(/\{[\s\S]*?"legs"\s*:\s*\[[\s\S]*?\][\s\S]*?\}/);
+        if (match2) {
+          try {
+            const parsed = JSON.parse(match2[0]);
+            if (parsed?.legs?.length > 0) {
+              console.log("✓ Extracted from cleaned text:", parsed.legs.length, "legs");
+              return parsed;
+            }
+          } catch { console.warn("Failed all JSON parsing attempts"); }
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -168,197 +303,44 @@ serve(async (req) => {
       });
     }
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
-        messages: [
-          {
-            role: "system",
-            content: `Você é um especialista ABSOLUTO em leitura de screenshots de plataformas brasileiras de opções de ações (Clear, XP, BTG Pactual, Profit Pro, Rico, Inter, Nubank, Modal, Genial, etc).
+    console.log("Starting OCR, image size:", Math.round(resolvedImage.length / 1024), "KB");
 
-MISSÃO: Extrair com 100% de precisão TODAS as pernas (legs) de uma operação estruturada de opções.
+    // Attempt 1: tool_calls with gemini-2.5-flash
+    let parsedResult = await callAI(LOVABLE_API_KEY, resolvedImage, true);
 
-## COMO LER A TABELA
-
-Cada LINHA da tabela do screenshot é UMA perna. Você DEVE extrair TODAS as linhas sem exceção.
-
-### Identificação dos campos:
-
-**SIDE (Compra/Venda)**:
-- "C" ou "Compra" → "buy"
-- "V" ou "Venda" → "sell"
-- Se a coluna mostrar cores: Verde/Azul geralmente = Compra, Vermelho = Venda
-- Para ativo-objeto sem indicação explícita, assuma "buy"
-
-**OPTION_TYPE (Tipo)**:
-- Se o ticker tem 5+ caracteres com letra na 5ª posição (ex: PETRC405, VALEJ380): é OPÇÃO
-  - Letras A-L na 5ª posição → "call"
-  - Letras M-X na 5ª posição → "put"
-- Se o ticker tem 4-5 caracteres (ex: PETR4, VALE3, BBAS3): é "stock" (ativo-objeto)
-- Se a coluna "Tipo" diz "Call" → "call", "Put" → "put"
-
-**ASSET (Ticker)**:
-- Copie EXATAMENTE como aparece no screenshot
-- Exemplos válidos: PETR4, PETRC405, PETRO405, VALE3, VALEJ380, BBAS3, BBASE100
-- NÃO modifique o ticker - copie letra por letra
-
-**STRIKE**:
-- Para opções: o preço de exercício (ex: 39.65, 40.50)
-- Para ativo-objeto (stock): o PREÇO ATUAL do ativo (ex: 39.61)
-- NUNCA deixe zero para stock!
-
-**PRICE (Prêmio)**:
-- Para opções: o prêmio pago/recebido (ex: 1.26, 0.53)
-- Para ativo-objeto (stock): SEMPRE 0
-
-**QUANTITY**:
-- Número de contratos/ações (geralmente 100)
-
-## EXEMPLO DE LEITURA
-
-Se o screenshot mostra 3 linhas:
-| C | PETRO405 | 39.65 | 1.26 | 100 |
-| V | PETRC407 | 39.90 | 0.53 | 100 |
-| C | PETR4    | 39.61 |      | 100 |
-
-Resultado:
-- Leg 1: side=buy, option_type=put, asset=PETRO405, strike=39.65, price=1.26, quantity=100
-- Leg 2: side=sell, option_type=call, asset=PETRC407, strike=39.90, price=0.53, quantity=100
-- Leg 3: side=buy, option_type=stock, asset=PETR4, strike=39.61, price=0, quantity=100
-
-## REGRAS CRÍTICAS
-1. NÚMERO DE PERNAS EXTRAÍDAS = NÚMERO DE LINHAS NA TABELA (obrigatório!)
-2. Preço de stock NUNCA pode ser 0 - procure em QUALQUER campo da linha
-3. Copie tickers EXATAMENTE como aparecem
-4. Se houver dúvida, inclua a perna - é melhor ter pernas extras do que faltar`,
-          },
-          {
-            role: "user",
-            content: [
-              { type: "text", text: "Extraia TODAS as pernas desta operação. Leia cada linha da tabela com máxima atenção. O número de pernas deve ser IGUAL ao número de linhas. Para ativo-objeto, o preço NUNCA pode ser zero." },
-              { type: "image_url", image_url: { url: resolvedImage } },
-            ],
-          },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "extract_legs",
-              description: "Extrai todas as pernas de uma operação estruturada de opções",
-              parameters: {
-                type: "object",
-                properties: {
-                  legs: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        side: { type: "string", enum: ["buy", "sell"], description: "buy=Compra/C, sell=Venda/V" },
-                        option_type: { type: "string", enum: ["call", "put", "stock"], description: "call, put, ou stock para ativo-objeto" },
-                        asset: { type: "string", description: "Ticker EXATO como aparece (PETR4, PETRC405, PETRO405)" },
-                        strike: { type: "number", description: "Strike da opção OU preço do ativo (NUNCA zero para stock)" },
-                        price: { type: "number", description: "Prêmio da opção (0 para stock)" },
-                        quantity: { type: "number", description: "Quantidade (geralmente 100)" },
-                      },
-                      required: ["side", "option_type", "asset", "strike", "price", "quantity"],
-                    },
-                  },
-                  total_rows_in_image: { type: "number", description: "Número total de linhas na tabela do screenshot" },
-                },
-                required: ["legs", "total_rows_in_image"],
-              },
-            },
-          },
-        ],
-        tool_choice: { type: "function", function: { name: "extract_legs" } },
-      }),
-    });
-
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Try again later." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Payment required." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const t = await response.text();
-      console.error("AI gateway error:", response.status, t);
-      throw new Error("AI gateway error");
+    // Attempt 2: if tool_calls failed, try plain JSON response
+    if (!parsedResult?.legs?.length) {
+      console.log("Tool calls attempt failed, retrying with plain JSON...");
+      parsedResult = await callAI(LOVABLE_API_KEY, resolvedImage, false);
     }
 
-    const result = await response.json();
-    
-    // Debug: log what the AI gateway returned
-    const msg = result.choices?.[0]?.message;
-    console.log("AI Response debug:", JSON.stringify({
-      hasToolCalls: !!msg?.tool_calls,
-      toolCallsCount: msg?.tool_calls?.length,
-      contentType: typeof msg?.content,
-      contentPreview: typeof msg?.content === "string" ? msg.content.substring(0, 500) : Array.isArray(msg?.content) ? "array" : typeof msg?.content,
-      finishReason: result.choices?.[0]?.finish_reason,
-    }));
-    
-    // Try tool_calls first, then fall back to parsing text content
-    let parsedTool: { legs?: RawLeg[]; total_rows_in_image?: number } | null = null;
-    
-    const toolCallArgs = msg?.tool_calls?.[0]?.function?.arguments;
-    if (toolCallArgs) {
-      try {
-        parsedTool = typeof toolCallArgs === "string" ? JSON.parse(toolCallArgs) : toolCallArgs;
-      } catch { console.warn("Failed to parse tool_calls arguments"); }
-    }
-    
-    // Fallback: extract JSON from text content if tool_calls didn't work
-    if (!parsedTool?.legs) {
-      let textContent = "";
-      if (typeof msg?.content === "string") {
-        textContent = msg.content;
-      } else if (Array.isArray(msg?.content)) {
-        textContent = msg.content
-          .filter((p: any) => p.type === "text")
-          .map((p: any) => p.text)
-          .join("\n");
-      }
-      
-      if (textContent) {
-        console.log("Fallback text (first 500):", textContent.substring(0, 500));
-        const jsonMatch = textContent.match(/\{[\s\S]*"legs"\s*:\s*\[[\s\S]*\][\s\S]*\}/);
-        if (jsonMatch) {
-          try {
-            parsedTool = JSON.parse(jsonMatch[0]);
-            console.log("Extracted legs from text fallback");
-          } catch { console.warn("Failed to parse JSON from text content"); }
-        }
-      }
-    }
+    const normalized = normalizeLegs(parsedResult?.legs);
 
-    console.log("OCR Extraction Summary:", JSON.stringify({
-      extracted: parsedTool?.legs?.length ?? 0,
-      imageRows: parsedTool?.total_rows_in_image,
-      legs: parsedTool?.legs,
+    console.log("OCR Final Result:", JSON.stringify({
+      rawLegs: parsedResult?.legs?.length ?? 0,
+      normalized: normalized.length,
+      imageRows: parsedResult?.total_rows_in_image,
     }));
 
-    const normalized = normalizeLegs(parsedTool?.legs);
-
-    if (normalized.length !== parsedTool?.total_rows_in_image) {
-      console.warn(`Mismatch: Extracted ${normalized.length} legs but image has ${parsedTool?.total_rows_in_image} rows.`);
+    if (normalized.length !== parsedResult?.total_rows_in_image) {
+      console.warn(`Mismatch: ${normalized.length} normalized vs ${parsedResult?.total_rows_in_image} image rows.`);
     }
 
     return new Response(JSON.stringify({ legs: normalized }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("analyze-options-image error:", e);
+    if (e?.status === 429) {
+      return new Response(JSON.stringify({ error: "Rate limit exceeded. Try again later." }), {
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (e?.status === 402) {
+      return new Response(JSON.stringify({ error: "Payment required." }), {
+        status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

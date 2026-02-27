@@ -11,32 +11,77 @@ interface MetricsCardsProps {
 }
 
 export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsProps) {
-  const isCollar = !!metrics.strategyType;
-  const montageValue = isCollar ? metrics.montageTotal ?? 0 : metrics.netCost;
-  const breakeven = isCollar && metrics.realBreakeven !== null && metrics.realBreakeven !== undefined ? metrics.realBreakeven : null;
+  const hasStrategy = !!metrics.strategyType;
+  const isCoveredCall = metrics.strategyType === 'CoveredCall';
+  const isCollar = metrics.strategyType === 'Collar';
 
-  const maxGainValue = isCollar
-    ? (typeof metrics.maxGain === 'number' ? metrics.maxGain : null)
-    : (metrics.maxGain === 'Ilimitado' ? null : Number(metrics.maxGain));
+  // Custo de montagem: para estratégias detectadas usa montageTotal, senão netCost
+  const montageValue = hasStrategy
+    ? (metrics.montageTotal ?? metrics.netCost)
+    : metrics.netCost;
 
-  const maxLossValue = isCollar
-    ? (typeof metrics.maxLoss === 'number' ? metrics.maxLoss : null)
-    : (metrics.maxLoss === 'Ilimitado' ? null : Number(metrics.maxLoss));
+  // Breakeven: usa o breakeven real da estratégia se disponível
+  const breakeven = hasStrategy && metrics.realBreakeven != null
+    ? metrics.realBreakeven
+    : null;
 
+  // Lucro máximo
+  const maxGainValue = metrics.maxGain === 'Ilimitado'
+    ? null
+    : (typeof metrics.maxGain === 'number' ? metrics.maxGain : null);
+
+  // Risco máximo
+  const maxLossValue = metrics.maxLoss === 'Ilimitado'
+    ? null
+    : (typeof metrics.maxLoss === 'number' ? metrics.maxLoss : null);
+
+  // Eficiência vs CDI
   const efficiency = cdiReturn > 0 && maxGainValue !== null && maxGainValue > 0
     ? (maxGainValue / cdiReturn) * 100
     : null;
 
+  // Rótulos dinâmicos por estratégia
+  const costLabel = isCoveredCall
+    ? 'Custo de Montagem'
+    : isCollar
+      ? 'Custo de Montagem'
+      : 'Custo Líquido';
+
+  const costTip = isCoveredCall
+    ? 'Desembolso total: (Preço Ativo - Prêmio Call) × Qtd'
+    : isCollar
+      ? 'Desembolso total: (Ativo + Put - Call) × Qtd'
+      : 'Valor líquido recebido (+) ou pago (-) ao montar a estrutura.';
+
+  const maxGainTip = isCoveredCall
+    ? '(Strike Call - Breakeven) × Qtd — ganho limitado pelo strike da call vendida'
+    : isCollar
+      ? '(Strike Call - Breakeven) × Qtd'
+      : 'Maior lucro possível no vencimento.';
+
+  const maxLossTip = metrics.isRiskFree
+    ? 'Strike da Put ≥ Breakeven: lucro garantido em qualquer cenário.'
+    : isCoveredCall
+      ? 'Custo de montagem total (ativo vai a zero)'
+      : isCollar
+        ? '(Breakeven - Strike Put) × Qtd'
+        : 'Maior prejuízo possível no vencimento.';
+
+  const breakevenLabel = hasStrategy ? 'Breakeven Real' : 'Breakeven';
+  const breakevenTip = isCoveredCall
+    ? 'Preço do ativo onde a operação não dá lucro nem prejuízo: Custo de Montagem ÷ Qtd'
+    : isCollar
+      ? 'Custo Total de Montagem ÷ Quantidade'
+      : 'Preço do ativo onde a operação não dá lucro nem prejuízo.';
+
   const items = [
     {
-      title: isCollar ? 'Custo de Montagem' : 'Custo Líquido',
-      value: `R$ ${montageValue.toFixed(2)}`,
+      title: costLabel,
+      value: `R$ ${Math.abs(montageValue).toFixed(2)}`,
       icon: DollarSign,
       color: 'text-muted-foreground',
       glowColor: '',
-      tip: isCollar
-        ? 'Desembolso total: (Ativo + Put - Call) × Qtd'
-        : 'Valor líquido recebido (+) ou pago (-) ao montar a estrutura.',
+      tip: costTip,
       badge: null as string | null,
       badgeColor: '',
     },
@@ -46,9 +91,7 @@ export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsPro
       icon: TrendingUp,
       color: 'text-success',
       glowColor: 'shadow-[0_0_20px_-4px_hsl(var(--success)/0.3)]',
-      tip: isCollar
-        ? '(Strike Call - Breakeven) × Qtd'
-        : 'Maior lucro possível no vencimento.',
+      tip: maxGainTip,
       badge: null,
       badgeColor: '',
     },
@@ -56,22 +99,18 @@ export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsPro
       title: 'Risco Máximo',
       value: metrics.isRiskFree
         ? 'R$ 0,00'
-        : (maxLossValue !== null ? `R$ ${maxLossValue.toFixed(2)}` : '∞'),
+        : (maxLossValue !== null ? `R$ ${Math.abs(maxLossValue).toFixed(2)}` : '∞'),
       icon: metrics.isRiskFree ? Shield : TrendingDown,
       color: metrics.isRiskFree ? 'text-success' : 'text-destructive',
       glowColor: metrics.isRiskFree
         ? 'shadow-[0_0_20px_-4px_hsl(var(--success)/0.3)]'
         : 'shadow-[0_0_20px_-4px_hsl(var(--destructive)/0.3)]',
-      tip: metrics.isRiskFree
-        ? 'Strike da Put > Breakeven: lucro garantido em qualquer cenário.'
-        : isCollar
-          ? '(Breakeven - Strike Put) × Qtd'
-          : 'Maior prejuízo possível no vencimento.',
+      tip: maxLossTip,
       badge: metrics.isRiskFree ? 'RISCO ZERO' : null,
       badgeColor: 'bg-success text-success-foreground',
     },
     {
-      title: isCollar ? 'Breakeven Real' : 'Breakeven',
+      title: breakevenLabel,
       value: breakeven !== null
         ? `R$ ${breakeven.toFixed(2)}`
         : (metrics.breakevens.length > 0
@@ -80,9 +119,7 @@ export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsPro
       icon: Target,
       color: 'text-warning',
       glowColor: 'shadow-[0_0_20px_-4px_hsl(var(--warning)/0.3)]',
-      tip: isCollar
-        ? 'Custo Total de Montagem ÷ Quantidade'
-        : 'Preço do ativo onde a operação não dá lucro nem prejuízo.',
+      tip: breakevenTip,
       badge: null,
       badgeColor: '',
     },

@@ -1,35 +1,72 @@
 import { Leg, PayoffPoint, AnalysisMetrics } from './types';
 import { detectStrategy } from './strategies';
 
+/**
+ * Calcula o payoff no vencimento para um dado preço spot.
+ *
+ * Para ATIVO (stock):
+ *   - O lucro/prejuízo é: (spotPrice - preçoDeCompra) × quantidade × sinal
+ *   - O campo `price` armazena o preço de compra do ativo.
+ *   - O campo `strike` é irrelevante para ativo; usamos `price` como custo base.
+ *
+ * Para CALL/PUT:
+ *   - O lucro/prejuízo é: (valorIntrínseco - prêmioPago) × quantidade × sinal
+ *   - Comprador (buy): paga o prêmio, recebe o valor intrínseco.
+ *   - Vendedor (sell): recebe o prêmio, paga o valor intrínseco.
+ */
 export function calculatePayoffAtExpiry(legs: Leg[], spotPrice: number): number {
   let total = 0;
   for (const leg of legs) {
     const multiplier = leg.side === 'buy' ? 1 : -1;
+
     if (leg.option_type === 'stock') {
-      total += multiplier * (spotPrice - leg.strike) * leg.quantity;
+      // Ativo: lucro = (spot - preço_de_compra) × qty para comprador
+      // O `price` é o preço de aquisição do ativo
+      total += multiplier * (spotPrice - leg.price) * leg.quantity;
+    } else if (leg.option_type === 'call') {
+      const intrinsic = Math.max(0, spotPrice - leg.strike);
+      // Comprador de call: recebe intrínseco, pagou prêmio → lucro = intrínseco - prêmio
+      // Vendedor de call: recebeu prêmio, paga intrínseco → lucro = prêmio - intrínseco
+      total += multiplier * (intrinsic - leg.price) * leg.quantity;
     } else {
-      let intrinsic = 0;
-      if (leg.option_type === 'call') {
-        intrinsic = Math.max(0, spotPrice - leg.strike);
-      } else {
-        intrinsic = Math.max(0, leg.strike - spotPrice);
-      }
+      // put
+      const intrinsic = Math.max(0, leg.strike - spotPrice);
       total += multiplier * (intrinsic - leg.price) * leg.quantity;
     }
   }
   return total;
 }
 
+/**
+ * Gera a curva de payoff com uma faixa de preços adequada.
+ *
+ * A faixa é calculada com base nos strikes das opções e no preço do ativo,
+ * garantindo que o gráfico mostre a forma completa do payoff (incluindo
+ * regiões de lucro e prejuízo).
+ */
 export function generatePayoffCurve(legs: Leg[], numPoints = 200): PayoffPoint[] {
   if (legs.length === 0) return [];
 
-  const strikes = legs.map(l => l.strike);
-  const minStrike = Math.min(...strikes);
-  const maxStrike = Math.max(...strikes);
-  const range = maxStrike - minStrike || maxStrike * 0.2;
-  const padding = range * 0.5;
-  const start = Math.max(0, minStrike - padding);
-  const end = maxStrike + padding;
+  // Coletar todos os preços de referência: strikes de opções + preços de ativos
+  const referencePoints: number[] = [];
+  for (const leg of legs) {
+    if (leg.option_type === 'stock') {
+      if (leg.price > 0) referencePoints.push(leg.price);
+    } else {
+      if (leg.strike > 0) referencePoints.push(leg.strike);
+    }
+  }
+
+  if (referencePoints.length === 0) return [];
+
+  const minRef = Math.min(...referencePoints);
+  const maxRef = Math.max(...referencePoints);
+  const range = maxRef - minRef || maxRef * 0.2;
+
+  // Padding de 40% para cada lado, garantindo boa visualização
+  const padding = Math.max(range * 0.4, maxRef * 0.15);
+  const start = Math.max(0.01, minRef - padding);
+  const end = maxRef + padding;
   const step = (end - start) / numPoints;
 
   const points: PayoffPoint[] = [];
@@ -44,47 +81,79 @@ export function generatePayoffCurve(legs: Leg[], numPoints = 200): PayoffPoint[]
   return points;
 }
 
+/**
+ * Calcula as métricas da estrutura: lucro máximo, risco máximo, breakevens e custo líquido.
+ *
+ * Custo líquido:
+ *   - Para cada perna: comprador paga (negativo para o caixa), vendedor recebe (positivo).
+ *   - netCost > 0: estrutura geradora de crédito (recebemos dinheiro).
+ *   - netCost < 0: estrutura devedora de débito (pagamos dinheiro).
+ */
 export function calculateMetrics(legs: Leg[]): AnalysisMetrics {
   if (legs.length === 0) return { maxGain: 0, maxLoss: 0, breakevens: [], netCost: 0 };
 
-  const curve = generatePayoffCurve(legs, 1000);
+  const curve = generatePayoffCurve(legs, 2000);
   const profits = curve.map(p => p.profitAtExpiry);
   const maxProfit = Math.max(...profits);
   const minProfit = Math.min(...profits);
 
-  // Find breakevens
+  // Detectar breakevens por cruzamento de zero
   const breakevens: number[] = [];
   for (let i = 1; i < curve.length; i++) {
     const prev = curve[i - 1].profitAtExpiry;
     const curr = curve[i].profitAtExpiry;
-    if ((prev <= 0 && curr >= 0) || (prev >= 0 && curr <= 0)) {
+    if ((prev < 0 && curr >= 0) || (prev >= 0 && curr < 0)) {
+      // Interpolação linear para encontrar o ponto exato
       const ratio = Math.abs(prev) / (Math.abs(prev) + Math.abs(curr));
       const be = curve[i - 1].price + ratio * (curve[i].price - curve[i - 1].price);
-      breakevens.push(Math.round(be * 100) / 100);
+      // Evitar duplicatas próximas
+      const isDuplicate = breakevens.some(b => Math.abs(b - be) < 0.05);
+      if (!isDuplicate) {
+        breakevens.push(Math.round(be * 100) / 100);
+      }
     }
   }
 
-  // Net cost
+  // Custo líquido da estrutura
+  // Comprador paga prêmio (saída de caixa = negativo)
+  // Vendedor recebe prêmio (entrada de caixa = positivo)
   let netCost = 0;
   for (const leg of legs) {
-    const multiplier = leg.side === 'buy' ? -1 : 1;
-    netCost += multiplier * leg.price * leg.quantity;
+    if (leg.option_type === 'stock') {
+      // Para ativo, o custo é o preço de compra (sempre débito para comprador)
+      const multiplier = leg.side === 'buy' ? -1 : 1;
+      netCost += multiplier * leg.price * leg.quantity;
+    } else {
+      const multiplier = leg.side === 'buy' ? -1 : 1;
+      netCost += multiplier * leg.price * leg.quantity;
+    }
   }
 
-  // Unlimited check
+  // Verificar se ganho/perda são ilimitados
+  // Uma estrutura tem ganho ilimitado se o payoff continua crescendo nos extremos
   const lastProfit = profits[profits.length - 1];
   const firstProfit = profits[0];
-  const isGainUnlimited = maxProfit === lastProfit || maxProfit === firstProfit;
-  const isLossUnlimited = minProfit === lastProfit || minProfit === firstProfit;
+  const secondLastProfit = profits[profits.length - 2];
+  const secondProfit = profits[1];
+
+  // Ganho ilimitado: payoff crescente no extremo direito ou esquerdo
+  const isGainUnlimitedRight = lastProfit > secondLastProfit && lastProfit > 0 && maxProfit === lastProfit;
+  const isGainUnlimitedLeft = firstProfit > secondProfit && firstProfit > 0 && maxProfit === firstProfit;
+  const isGainUnlimited = isGainUnlimitedRight || isGainUnlimitedLeft;
+
+  // Perda ilimitada: payoff decrescente no extremo direito ou esquerdo (valores negativos)
+  const isLossUnlimitedRight = lastProfit < secondLastProfit && lastProfit < 0 && minProfit === lastProfit;
+  const isLossUnlimitedLeft = firstProfit < secondProfit && firstProfit < 0 && minProfit === firstProfit;
+  const isLossUnlimited = isLossUnlimitedRight || isLossUnlimitedLeft;
 
   const result: AnalysisMetrics = {
-    maxGain: isGainUnlimited && maxProfit > 0 ? 'Ilimitado' : Math.round(maxProfit * 100) / 100,
-    maxLoss: isLossUnlimited && minProfit < 0 ? 'Ilimitado' : Math.round(minProfit * 100) / 100,
+    maxGain: isGainUnlimited ? 'Ilimitado' : Math.round(maxProfit * 100) / 100,
+    maxLoss: isLossUnlimited ? 'Ilimitado' : Math.round(minProfit * 100) / 100,
     breakevens,
     netCost: Math.round(netCost * 100) / 100,
   };
 
-  // Enrich with strategy detection
+  // Enriquecer com detecção de estratégia (Collar, etc.)
   const strategy = detectStrategy(legs);
   if (strategy) {
     result.strategyType = strategy.type;
@@ -92,7 +161,6 @@ export function calculateMetrics(legs: Leg[]): AnalysisMetrics {
     result.montageTotal = strategy.montageTotal;
     result.realBreakeven = strategy.breakeven;
     result.isRiskFree = strategy.isRiskFree;
-    // Override maxGain/maxLoss with precise Collar values
     result.maxGain = strategy.maxProfit;
     result.maxLoss = strategy.isRiskFree ? 0 : -Math.abs(strategy.maxLoss);
   }
@@ -106,6 +174,7 @@ export function calculateCDIReturn(
   days: number,
   withIR: boolean
 ): number {
+  if (principal <= 0 || cdiRate <= 0 || days <= 0) return 0;
   const dailyRate = Math.pow(1 + cdiRate / 100, 1 / 252) - 1;
   const grossReturn = principal * (Math.pow(1 + dailyRate, days) - 1);
   if (!withIR) return Math.round(grossReturn * 100) / 100;

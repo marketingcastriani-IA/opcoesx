@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { calculateCDIReturn } from '@/lib/payoff';
 import { AnalysisMetrics } from '@/lib/types';
 import { getExpiryOptions } from '@/lib/b3-calendar';
@@ -39,15 +39,27 @@ export default function CDIComparison({ metrics, cdiRate, setCdiRate, daysToExpi
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const expiryOptions = useMemo(() => getExpiryOptions(selectedYear), [selectedYear]);
 
-  const isCollar = !!metrics.strategyType;
-  const investedCapital = isCollar && metrics.montageTotal
-    ? Math.abs(metrics.montageTotal)
-    : Math.max(Math.abs(metrics.netCost), 100);
+  const hasStrategy = !!metrics.strategyType;
+
+  // Capital investido: usa montageTotal se disponível (estratégia detectada), senão netCost
+  // Sempre usa valor absoluto pois representa o desembolso real
+  const investedCapital = useMemo(() => {
+    if (hasStrategy && metrics.montageTotal != null && metrics.montageTotal !== 0) {
+      return Math.abs(metrics.montageTotal);
+    }
+    const nc = Math.abs(metrics.netCost);
+    return nc > 0 ? nc : 100;
+  }, [hasStrategy, metrics.montageTotal, metrics.netCost]);
 
   const cdiReturn = calculateCDIReturn(investedCapital, cdiRate, daysToExpiry, applyIRCDI);
 
-  const optionMaxGainRaw = typeof metrics.maxGain === 'number' ? metrics.maxGain : Number.POSITIVE_INFINITY;
-  const optionMaxLossRaw = typeof metrics.maxLoss === 'number' ? metrics.maxLoss : Number.NEGATIVE_INFINITY;
+  const optionMaxGainRaw = metrics.maxGain === 'Ilimitado'
+    ? Number.POSITIVE_INFINITY
+    : (typeof metrics.maxGain === 'number' ? metrics.maxGain : Number.POSITIVE_INFINITY);
+
+  const optionMaxLossRaw = metrics.maxLoss === 'Ilimitado'
+    ? Number.NEGATIVE_INFINITY
+    : (typeof metrics.maxLoss === 'number' ? metrics.maxLoss : Number.NEGATIVE_INFINITY);
 
   const optionMaxGain = Number.isFinite(optionMaxGainRaw)
     ? (applyIROptions ? optionMaxGainRaw * 0.85 : optionMaxGainRaw)
@@ -78,22 +90,31 @@ export default function CDIComparison({ metrics, cdiRate, setCdiRate, daysToExpi
     }
 
     return { optionBetter, spread, verdict, efficiency };
-  }, [cdiRate, daysToExpiry, cdiReturn, optionMaxGain, optionMaxLoss, metrics.isRiskFree]);
+  }, [cdiRate, daysToExpiry, cdiReturn, optionMaxGain, metrics.isRiskFree]);
 
   const cdiRoi = investedCapital > 0 ? (cdiReturn / investedCapital) * 100 : 0;
-  const optionRoi = Number.isFinite(optionMaxGain) && investedCapital > 0 ? (optionMaxGain / investedCapital) * 100 : null;
+  const optionRoi = Number.isFinite(optionMaxGain) && investedCapital > 0
+    ? (optionMaxGain / investedCapital) * 100
+    : null;
 
   const handleExpiryChange = (value: string) => {
     setExpiryDate(value);
     setDaysToExpiry(calculateDaysFromDate(value));
   };
 
+  // Rótulo do breakeven
+  const breakevenDisplay = metrics.realBreakeven != null
+    ? `R$ ${metrics.realBreakeven.toFixed(2)}`
+    : (metrics.breakevens.length > 0
+      ? metrics.breakevens.map(v => `R$ ${v.toFixed(2)}`).join(' | ')
+      : 'N/A');
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
           Comparativo: Estratégia vs CDI
-          {comparison?.efficiency !== null && comparison?.efficiency !== undefined && (
+          {comparison?.efficiency != null && (
             <Badge
               variant={comparison.efficiency >= 100 ? 'default' : 'destructive'}
               className={comparison.efficiency >= 100 ? 'bg-success text-success-foreground' : ''}
@@ -107,11 +128,25 @@ export default function CDIComparison({ metrics, cdiRate, setCdiRate, daysToExpi
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-1">
             <Label className="text-xs">Taxa CDI (% a.a.)</Label>
-            <Input type="number" step="0.01" value={cdiRate || ''} onChange={e => setCdiRate(parseFloat(e.target.value) || 0)} placeholder="14.90" className="font-mono" />
+            <Input
+              type="number"
+              step="0.01"
+              value={cdiRate || ''}
+              onChange={e => setCdiRate(parseFloat(e.target.value) || 0)}
+              placeholder="14.90"
+              className="font-mono"
+            />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Dias úteis até vencimento</Label>
-            <Input type="number" min={1} value={daysToExpiry || ''} onChange={e => setDaysToExpiry(parseInt(e.target.value) || 0)} placeholder="30" className="font-mono" />
+            <Input
+              type="number"
+              min={1}
+              value={daysToExpiry || ''}
+              onChange={e => setDaysToExpiry(parseInt(e.target.value) || 0)}
+              placeholder="30"
+              className="font-mono"
+            />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Ano</Label>
@@ -179,19 +214,17 @@ export default function CDIComparison({ metrics, cdiRate, setCdiRate, daysToExpi
               <div className="rounded-lg border p-3 bg-muted/20">
                 <p className="text-xs text-muted-foreground mb-1">Perda máxima da estrutura</p>
                 <p className={`text-lg font-bold font-mono ${metrics.isRiskFree ? 'text-success' : 'text-destructive'}`}>
-                  {metrics.isRiskFree ? 'Risco Zero' : (Number.isFinite(optionMaxLoss) ? formatMoney(optionMaxLoss) : 'Ilimitada')}
+                  {metrics.isRiskFree
+                    ? 'Risco Zero'
+                    : (Number.isFinite(optionMaxLoss)
+                      ? formatMoney(Math.abs(optionMaxLoss))
+                      : 'Ilimitada')}
                 </p>
               </div>
 
               <div className="rounded-lg border p-3 bg-muted/20">
                 <p className="text-xs text-muted-foreground mb-1">Breakeven</p>
-                <p className="text-sm font-mono">
-                  {metrics.realBreakeven
-                    ? `R$ ${metrics.realBreakeven.toFixed(2)}`
-                    : (metrics.breakevens.length > 0
-                      ? metrics.breakevens.map(v => `R$ ${v.toFixed(2)}`).join(' | ')
-                      : 'N/A')}
-                </p>
+                <p className="text-sm font-mono">{breakevenDisplay}</p>
               </div>
             </div>
 

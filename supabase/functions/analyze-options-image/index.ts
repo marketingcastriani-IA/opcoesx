@@ -93,37 +93,54 @@ const normalizeLegs = (legs: RawLeg[] | undefined) => {
       let price = priceRaw;
 
       if (optionType === "stock") {
-        // TURBO: Lógica definitiva para ativo
-        // Tenta extrair preço em qualquer campo, com múltiplas tentativas
+        // VALIDAÇÃO TRIPLA: Preço de Ativo
         let assetPrice = 0;
 
-        // Tentativa 1: price > 0
+        // Tentativa 1: price > 0 (campo de preço do prêmio)
         if (priceRaw > 0) {
+          console.log(`Leg ${idx}: Preço encontrado no campo PRICE: ${priceRaw}`);
           assetPrice = priceRaw;
         }
-        // Tentativa 2: strike > 0
+        // Tentativa 2: strike > 0 (campo de strike)
         else if (strikeRaw > 0) {
+          console.log(`Leg ${idx}: Preço encontrado no campo STRIKE: ${strikeRaw}`);
           assetPrice = strikeRaw;
         }
-        // Tentativa 3: tenta extrair de strings adicionais
-        else if (leg.price && typeof leg.price === "string") {
-          const extracted = toNumber(leg.price);
-          if (extracted > 0) assetPrice = extracted;
-        }
-        // Tentativa 4: tenta extrair de strike como string
-        else if (leg.strike && typeof leg.strike === "string") {
-          const extracted = toNumber(leg.strike);
-          if (extracted > 0) assetPrice = extracted;
+        // Tentativa 3: Busca em strings adicionais (fallback)
+        else {
+          // Tenta extrair de price como string
+          if (leg.price && typeof leg.price === "string") {
+            const extracted = toNumber(leg.price);
+            if (extracted > 0) {
+              console.log(`Leg ${idx}: Preço extraído de string PRICE: ${extracted}`);
+              assetPrice = extracted;
+            }
+          }
+          // Tenta extrair de strike como string
+          if (assetPrice === 0 && leg.strike && typeof leg.strike === "string") {
+            const extracted = toNumber(leg.strike);
+            if (extracted > 0) {
+              console.log(`Leg ${idx}: Preço extraído de string STRIKE: ${extracted}`);
+              assetPrice = extracted;
+            }
+          }
         }
 
         if (assetPrice <= 0) {
-          console.error(`Leg ${idx}: ERRO CRÍTICO - Preço do ativo não encontrado após 4 tentativas. Strike: ${strikeRaw}, Price: ${priceRaw}`);
+          console.error(`Leg ${idx}: ERRO CRÍTICO - Preço do ativo não encontrado. Strike: ${strikeRaw}, Price: ${priceRaw}, Raw Strike: ${leg.strike}, Raw Price: ${leg.price}`);
+          return null;
+        }
+
+        // Validação: preço de ação deve estar entre 0.01 e 10000
+        if (assetPrice < 0.01 || assetPrice > 10000) {
+          console.error(`Leg ${idx}: Preço de ativo fora do intervalo válido: ${assetPrice}`);
           return null;
         }
 
         strike = assetPrice;
         price = 0;
       } else {
+        // Validação para opções
         if (strike <= 0) {
           console.warn(`Leg ${idx}: Strike inválido (${strikeRaw})`);
           return null;
@@ -187,9 +204,9 @@ serve(async (req) => {
             role: "system",
             content: `Você é especialista em leitura de screenshots de plataformas brasileiras de opções (Clear, XP, BTG, Profit, Rico, Inter, Nubank, etc).
 
-OBJETIVO: Extrair TODAS as pernas com 100% de precisão. NÃO invente. NÃO omita.
+OBJETIVO CRÍTICO: Extrair TODAS as pernas com 100% de precisão. O preço do ativo é CRÍTICO - nunca deixe em branco ou zero.
 
-REGRAS CRÍTICAS:
+REGRAS ABSOLUTAS:
 
 1. **SIDE**: "buy" (Compra/C) ou "sell" (Venda/V)
 
@@ -199,11 +216,15 @@ REGRAS CRÍTICAS:
    - "stock" para Ativo-Objeto (PETR4, VALE3, etc - sem Call/Put)
 
 3. **ASSET**: Ticker em MAIÚSCULAS (PETR4, PETRC405, etc)
+   - Ativo-objeto: 4-5 caracteres (PETR4, VALE3, BBAS3)
+   - Opção: 7 caracteres (PETRC405, VALEJ405)
 
 4. **STRIKE**: 
    - Para opções: preço de exercício (39.65, 30.00)
    - Para ativos (stock): SEMPRE o preço unitário (39.61, 25.50, etc)
    - CRÍTICO: Nunca deixe em branco ou zero para ativos!
+   - Se o preço estiver em "Preço", coloque em STRIKE
+   - Se o preço estiver em "Strike", coloque em STRIKE
 
 5. **PRICE**:
    - Para opções: prêmio (0.80, 1.50)
@@ -219,12 +240,13 @@ CHECKLIST FINAL:
 ✓ Cada linha da tabela = uma perna?
 ✓ Ativos têm preço em STRIKE, 0 em PRICE?
 ✓ Nenhum preço ficou zero para ativos?
-✓ Número de pernas = número de linhas?`,
+✓ Número de pernas = número de linhas?
+✓ Preço de ativo está entre 0.01 e 10000?`,
           },
           {
             role: "user",
             content: [
-              { type: "text", text: "Extraia TODAS as pernas com máxima precisão. CRÍTICO PARA ATIVOS: O preço SEMPRE vai em STRIKE (nunca em PRICE). Valide que o número de pernas extraídas = número de linhas na tabela." },
+              { type: "text", text: "CRÍTICO: Extraia TODAS as pernas com máxima precisão. ESPECIAL ATENÇÃO AO PREÇO DO ATIVO - ele NUNCA pode ser zero. Se vir um ativo (como PETR4, VALE3, etc), o preço DEVE estar em STRIKE. Valide que o número de pernas extraídas = número de linhas na tabela. Se houver dúvida sobre o preço do ativo, procure em TODOS os campos da linha." },
               { type: "image_url", image_url: { url: resolvedImage } },
             ],
           },
@@ -234,7 +256,7 @@ CHECKLIST FINAL:
             type: "function",
             function: {
               name: "extract_legs",
-              description: "Extrai todas as pernas com validação de precisão",
+              description: "Extrai todas as pernas com validação crítica de preço de ativo",
               parameters: {
                 type: "object",
                 properties: {
@@ -287,6 +309,7 @@ CHECKLIST FINAL:
     console.log("OCR Extraction Summary:", {
       extracted: parsedTool?.legs?.length,
       imageRows: parsedTool?.total_rows_in_image,
+      legs: parsedTool?.legs,
     });
 
     const normalized = normalizeLegs(parsedTool?.legs);

@@ -25,7 +25,16 @@ export default function LegForm({ onAdd }: LegFormProps) {
     if (!leg.asset) return;
     if (leg.quantity <= 0) return;
     if (leg.price < 0) return;
-    if (leg.option_type !== 'stock' && leg.strike <= 0) return;
+    
+    // Validação crítica para ativos
+    if (leg.option_type === 'stock') {
+      if (leg.strike <= 0 && leg.price <= 0) {
+        alert('Para ativos, o preço é obrigatório!');
+        return;
+      }
+    } else {
+      if (leg.strike <= 0) return;
+    }
 
     const strike = leg.option_type === 'stock' && leg.strike <= 0 ? leg.price : leg.strike;
     onAdd({ ...leg, strike });
@@ -65,18 +74,19 @@ export default function LegForm({ onAdd }: LegFormProps) {
         <Input value={leg.asset} onChange={e => setLeg(p => ({ ...p, asset: e.target.value.toUpperCase() }))} placeholder="PETR4" />
       </div>
       <div className="space-y-1">
-        <Label className="text-xs">Strike</Label>
+        <Label className="text-xs">{leg.option_type === 'stock' ? 'Preço do Ativo' : 'Strike'}</Label>
         <Input
           type="number"
           step="0.01"
           value={leg.option_type === 'stock' ? (leg.price || '') : (leg.strike || '')}
           onChange={e => setLeg(p => ({ ...p, strike: parseFloat(e.target.value) || 0 }))}
-          placeholder="30.00"
+          placeholder={leg.option_type === 'stock' ? '39.61' : '30.00'}
           disabled={leg.option_type === 'stock'}
+          className={leg.option_type === 'stock' && leg.price <= 0 ? 'border-destructive' : ''}
         />
       </div>
       <div className="space-y-1">
-        <Label className="text-xs">Preço</Label>
+        <Label className="text-xs">{leg.option_type === 'stock' ? 'Preço (Auto)' : 'Prêmio'}</Label>
         <Input
           type="number"
           step="0.01"
@@ -87,7 +97,9 @@ export default function LegForm({ onAdd }: LegFormProps) {
               ? { ...p, price, strike: price }
               : { ...p, price };
           })}
-          placeholder="1.50"
+          placeholder={leg.option_type === 'stock' ? '39.61' : '1.50'}
+          disabled={leg.option_type === 'stock'}
+          className={leg.option_type === 'stock' ? 'bg-muted/50' : ''}
         />
       </div>
       <div className="flex gap-2 items-end">

@@ -267,7 +267,7 @@ export default function Dashboard() {
             <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
               <CardHeader><CardTitle className="text-base">Gráfico de Payoff</CardTitle></CardHeader>
               <CardContent>
-                <PayoffChart data={payoffData} breakevens={metrics.realBreakeven ? (Array.isArray(metrics.realBreakeven) ? metrics.realBreakeven : [metrics.realBreakeven]) : metrics.breakevens} cdiRate={cdiRate} daysToExpiry={daysToExpiry} netCost={metrics.netCost} montageTotal={metrics.montageTotal} />
+                <PayoffChart data={payoffData} breakevens={metrics.realBreakeven ? [metrics.realBreakeven] : metrics.breakevens} cdiRate={cdiRate} daysToExpiry={daysToExpiry} netCost={metrics.netCost} montageTotal={metrics.montageTotal} />
               </CardContent>
             </Card>
             <CDIComparison metrics={metrics} cdiRate={cdiRate} setCdiRate={setCdiRate} daysToExpiry={daysToExpiry} setDaysToExpiry={setDaysToExpiry} />

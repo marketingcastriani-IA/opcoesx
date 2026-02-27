@@ -2,58 +2,13 @@ import { Leg } from '@/lib/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Trash2, AlertCircle, CheckCircle2, Plus, Minus } from 'lucide-react';
+import { Trash2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface LegsTableProps {
   legs: Leg[];
   onRemove: (index: number) => void;
   onUpdate: (index: number, leg: Leg) => void;
-}
-
-function StepperInput({
-  value,
-  onChange,
-  step = 0.01,
-  min,
-  className,
-}: {
-  value: number;
-  onChange: (v: number) => void;
-  step?: number;
-  min?: number;
-  className?: string;
-}) {
-  return (
-    <div className="flex items-center gap-0.5">
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="h-7 w-7 shrink-0 rounded-md border border-input bg-background hover:bg-muted"
-        onClick={() => onChange(Math.max(min ?? -Infinity, Math.round((value - step) * 100) / 100))}
-      >
-        <Minus className="h-3 w-3" />
-      </Button>
-      <Input
-        type="number"
-        step={step}
-        min={min}
-        value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-        className={cn("h-9 text-right font-bold text-base cursor-text", className)}
-      />
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="h-7 w-7 shrink-0 rounded-md border border-input bg-background hover:bg-muted"
-        onClick={() => onChange(Math.round((value + step) * 100) / 100)}
-      >
-        <Plus className="h-3 w-3" />
-      </Button>
-    </div>
-  );
 }
 
 export default function LegsTable({ legs, onRemove, onUpdate }: LegsTableProps) {
@@ -141,45 +96,49 @@ export default function LegsTable({ legs, onRemove, onUpdate }: LegsTableProps) 
                 </TableCell>
                 <TableCell>
                   <div className="relative">
-                    <StepperInput
+                    <Input
+                      type="number"
+                      step="0.01"
                       value={leg.option_type === 'stock' ? leg.price : leg.strike}
-                      onChange={(v) => updateField(i, 'strike', v)}
-                      step={0.01}
+                      onChange={(e) => updateField(i, 'strike', parseFloat(e.target.value) || 0)}
                       className={cn(
-                        "pr-8",
+                        "h-9 text-right font-bold text-base pr-8",
                         isStock && "border-primary/40 bg-gradient-to-r from-primary/20 to-primary/10 text-primary font-black",
                         !isStock && "font-mono"
                       )}
+                      disabled={leg.option_type === 'stock'}
                     />
                     {isStock && hasPrice && (
-                      <CheckCircle2 className="absolute right-9 top-1/2 -translate-y-1/2 h-5 w-5 text-success" />
+                      <CheckCircle2 className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 text-success" />
                     )}
                   </div>
                 </TableCell>
                 <TableCell>
                   <div className="relative">
-                    <StepperInput
+                    <Input
+                      type="number"
+                      step="0.01"
                       value={leg.price}
-                      onChange={(v) => updateField(i, 'price', v)}
-                      step={0.01}
+                      onChange={(e) => updateField(i, 'price', parseFloat(e.target.value) || 0)}
                       className={cn(
-                        "pr-8",
+                        "h-9 text-right font-bold text-base pr-8",
                         isStock && "border-primary/40 bg-gradient-to-r from-primary/20 to-primary/10 text-primary font-black",
                         !isStock && "font-mono"
                       )}
+                      disabled={isStock}
                     />
                     {isStock && !hasPrice && (
-                      <AlertCircle className="absolute right-9 top-1/2 -translate-y-1/2 h-5 w-5 text-destructive" />
+                      <AlertCircle className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 text-destructive" />
                     )}
                   </div>
                 </TableCell>
                 <TableCell>
-                  <StepperInput
-                    value={leg.quantity}
-                    onChange={(v) => updateField(i, 'quantity', Math.max(1, Math.round(v)))}
-                    step={1}
+                  <Input
+                    type="number"
                     min={1}
-                    className="font-semibold"
+                    value={leg.quantity}
+                    onChange={(e) => updateField(i, 'quantity', parseInt(e.target.value) || 1)}
+                    className="h-9 text-right font-semibold"
                   />
                 </TableCell>
                 <TableCell>

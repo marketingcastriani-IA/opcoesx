@@ -232,19 +232,9 @@ export default function AnalysisDetail() {
   const closeOperation = async () => {
     setClosing(true);
     try {
-      // Save current prices first
-      for (const leg of dbLegs) {
-        const cp = parseFloat(currentPrices[leg.id] || '');
-        if (!isNaN(cp)) {
-          await supabase.from('legs').update({
-            current_price: cp,
-          } as any).eq('id', leg.id);
-        }
-      }
-      // Update status to closed
       await supabase.from('analyses').update({ status: 'closed' } as any).eq('id', id!);
       setAnalysis(prev => prev ? { ...prev, status: 'closed' } : prev);
-      toast.success('Operação encerrada e salva no portfólio!');
+      toast.success('Operação encerrada!');
     } catch (err: any) {
       toast.error('Erro: ' + err.message);
     } finally {
@@ -442,7 +432,7 @@ export default function AnalysisDetail() {
           <CardContent>
             <PayoffChart
               data={payoffData}
-              breakevens={metrics.realBreakeven ? (Array.isArray(metrics.realBreakeven) ? metrics.realBreakeven : [metrics.realBreakeven]) : metrics.breakevens}
+              breakevens={metrics.realBreakeven ? [metrics.realBreakeven] : metrics.breakevens}
               cdiRate={cdiRate}
               daysToExpiry={daysToExpiry}
               netCost={metrics.netCost}

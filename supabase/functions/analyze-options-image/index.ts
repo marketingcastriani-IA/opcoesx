@@ -93,42 +93,52 @@ const normalizeLegs = (legs: RawLeg[] | undefined) => {
       let price = priceRaw;
 
       if (optionType === "stock") {
-        // Para ativo-objeto: o preço deve estar em strike ou price
+        // VALIDAÇÃO TRIPLA: Preço de Ativo
         let assetPrice = 0;
 
-        // Prioridade 1: price > 0 (campo Preço da corretora)
+        // Tentativa 1: price > 0 (campo de preço do prêmio)
         if (priceRaw > 0) {
+          console.log(`Leg ${idx}: Preço encontrado no campo PRICE: ${priceRaw}`);
           assetPrice = priceRaw;
         }
-        // Prioridade 2: strike > 0 (campo Strike pode ter o preço)
+        // Tentativa 2: strike > 0 (campo de strike)
         else if (strikeRaw > 0) {
+          console.log(`Leg ${idx}: Preço encontrado no campo STRIKE: ${strikeRaw}`);
           assetPrice = strikeRaw;
         }
-        // Prioridade 3: extrai de strings
+        // Tentativa 3: Busca em strings adicionais (fallback)
         else {
+          // Tenta extrair de price como string
           if (leg.price && typeof leg.price === "string") {
             const extracted = toNumber(leg.price);
-            if (extracted > 0) assetPrice = extracted;
+            if (extracted > 0) {
+              console.log(`Leg ${idx}: Preço extraído de string PRICE: ${extracted}`);
+              assetPrice = extracted;
+            }
           }
+          // Tenta extrair de strike como string
           if (assetPrice === 0 && leg.strike && typeof leg.strike === "string") {
             const extracted = toNumber(leg.strike);
-            if (extracted > 0) assetPrice = extracted;
+            if (extracted > 0) {
+              console.log(`Leg ${idx}: Preço extraído de string STRIKE: ${extracted}`);
+              assetPrice = extracted;
+            }
           }
         }
 
         if (assetPrice <= 0) {
-          console.error(`Leg ${idx}: ERRO - Preço do ativo não encontrado. Strike: ${strikeRaw}, Price: ${priceRaw}`);
+          console.error(`Leg ${idx}: ERRO CRÍTICO - Preço do ativo não encontrado. Strike: ${strikeRaw}, Price: ${priceRaw}, Raw Strike: ${leg.strike}, Raw Price: ${leg.price}`);
           return null;
         }
 
+        // Validação: preço de ação deve estar entre 0.01 e 10000
         if (assetPrice < 0.01 || assetPrice > 10000) {
-          console.error(`Leg ${idx}: Preço fora do intervalo: ${assetPrice}`);
+          console.error(`Leg ${idx}: Preço de ativo fora do intervalo válido: ${assetPrice}`);
           return null;
         }
 
-        // CORREÇÃO: para stock, strike = preço E price = preço (para cálculos de payoff)
         strike = assetPrice;
-        price = assetPrice;
+        price = 0;
       } else {
         // Validação para opções
         if (strike <= 0) {
@@ -194,41 +204,33 @@ serve(async (req) => {
             role: "system",
             content: `Você é especialista em leitura de screenshots de plataformas brasileiras de opções (Clear, XP, BTG, Profit, Rico, Inter, Nubank, etc).
 
-OBJETIVO CRÍTICO: Extrair TODAS as pernas com 100% de precisão. O preço do ativo é ABSOLUTAMENTE CRÍTICO - nunca deixe em branco ou zero. Procure em TODOS os campos da linha.
+OBJETIVO CRÍTICO: Extrair TODAS as pernas com 100% de precisão. O preço do ativo é CRÍTICO - nunca deixe em branco ou zero.
 
 REGRAS ABSOLUTAS:
 
-1. SIDE: "buy" (Compra/C) ou "sell" (Venda/V)
+1. **SIDE**: "buy" (Compra/C) ou "sell" (Venda/V)
 
-2. OPTION_TYPE: 
+2. **OPTION_TYPE**: 
    - "call" para Call
    - "put" para Put
    - "stock" para Ativo-Objeto (PETR4, VALE3, etc - sem Call/Put)
 
-3. ASSET: Ticker em MAIÚSCULAS (PETR4, PETRC405, etc)
+3. **ASSET**: Ticker em MAIÚSCULAS (PETR4, PETRC405, etc)
    - Ativo-objeto: 4-5 caracteres (PETR4, VALE3, BBAS3)
    - Opção: 7 caracteres (PETRC405, VALEJ405)
 
-4. STRIKE: 
+4. **STRIKE**: 
    - Para opções: preço de exercício (39.65, 30.00)
    - Para ativos (stock): SEMPRE o preço unitário (39.61, 25.50, etc)
    - CRÍTICO: Nunca deixe em branco ou zero para ativos!
    - Se o preço estiver em "Preço", coloque em STRIKE
    - Se o preço estiver em "Strike", coloque em STRIKE
-   - Se o preço estiver em qualquer outro campo, AINDA ASSIM coloque em STRIKE
-   - Procure em TODAS as colunas da linha do ativo
 
-5. PRICE:
+5. **PRICE**:
    - Para opções: prêmio (0.80, 1.50)
-   - Para ativos: SEMPRE 0 (zero) - NÃO coloque o preço do ativo aqui
+   - Para ativos: SEMPRE 0 (zero)
 
-6. QUANTITY: Número inteiro >= 1 (padrão 100)
-
-7. REGRA DE OURO PARA ATIVOS:
-   - Se a linha tem um ticker de 4-5 caracteres (PETR4, VALE3, BBAS3), é um ATIVO
-   - Ativos SEMPRE têm um preço unitário visível na linha
-   - Procure esse preço em: coluna "Preço", coluna "Strike", coluna "Bid", coluna "Ask", ou qualquer valor numérico > 0 na linha
-   - Se encontrar múltiplos valores, escolha o que faz sentido (ex: 39.61 para PETR4)
+6. **QUANTITY**: Número inteiro >= 1 (padrão 100)
 
 EXEMPLO CORRETO (Compra Coberta):
 Linha 1: side=sell, option_type=call, asset=PETRC405, strike=39.65, price=0.80, quantity=100
@@ -244,7 +246,7 @@ CHECKLIST FINAL:
           {
             role: "user",
             content: [
-              { type: "text", text: "INSTRUÇÕES CRÍTICAS:\n1. Extraia TODAS as pernas com máxima precisão\n2. ESPECIAL ATENÇÃO AO PREÇO DO ATIVO - ele NUNCA pode ser zero\n3. Se vir um ativo (como PETR4, VALE3, BBAS3, etc), o preço DEVE estar em STRIKE\n4. Procure o preço do ativo em TODOS os campos da linha (Preço, Strike, Bid, Ask, etc)\n5. Valide que o número de pernas extraídas = número de linhas na tabela\n6. Se houver dúvida, escolha o valor numérico que faz sentido para o ativo\n7. NUNCA deixe preço de ativo em branco ou zero" },
+              { type: "text", text: "CRÍTICO: Extraia TODAS as pernas com máxima precisão. ESPECIAL ATENÇÃO AO PREÇO DO ATIVO - ele NUNCA pode ser zero. Se vir um ativo (como PETR4, VALE3, etc), o preço DEVE estar em STRIKE. Valide que o número de pernas extraídas = número de linhas na tabela. Se houver dúvida sobre o preço do ativo, procure em TODOS os campos da linha." },
               { type: "image_url", image_url: { url: resolvedImage } },
             ],
           },

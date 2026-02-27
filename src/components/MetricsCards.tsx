@@ -9,9 +9,10 @@ interface MetricsCardsProps {
   metrics: AnalysisMetrics;
   cdiReturn?: number;
   daysToExpiry?: number;
+  investedCapital?: number;
 }
 
-export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsProps) {
+export default function MetricsCards({ metrics, cdiReturn = 0, investedCapital = 0 }: MetricsCardsProps) {
   const hasStrategy = !!metrics.strategyType;
   const isCoveredCall = metrics.strategyType === 'CoveredCall';
   const isCollar = metrics.strategyType === 'Collar';
@@ -85,43 +86,49 @@ export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsPro
           ? 'Strike da Put Comprada - Débito Líquido por ação'
           : 'Preço do ativo onde a operação não dá lucro nem prejuízo.';
 
-  type CardTheme = 'blue' | 'green' | 'red' | 'yellow' | 'white' | 'purple';
+  type CardTheme = 'neutral' | 'green' | 'red' | 'yellow' | 'blue' | 'purple';
 
-  const themeClasses: Record<CardTheme, { card: string; icon: string; text: string; badge: string }> = {
-    blue: {
-      card: 'border-info/30 bg-gradient-to-br from-info/10 via-card to-card hover:border-info/50 hover:shadow-[0_0_30px_-8px_hsl(var(--info)/0.35)]',
-      icon: 'bg-info/15 text-info',
-      text: 'text-info',
-      badge: 'bg-info/20 text-info border-info/40',
+  const themeClasses: Record<CardTheme, { card: string; icon: string; value: string; label: string; badge: string }> = {
+    neutral: {
+      card: 'border-border bg-card shadow-sm hover:shadow-md',
+      icon: 'bg-muted text-muted-foreground',
+      value: 'text-foreground',
+      label: 'text-muted-foreground',
+      badge: 'bg-muted text-muted-foreground',
     },
     green: {
-      card: 'border-success/30 bg-gradient-to-br from-success/10 via-card to-card hover:border-success/50 hover:shadow-[0_0_30px_-8px_hsl(var(--success)/0.35)]',
-      icon: 'bg-success/15 text-success',
-      text: 'text-success',
+      card: 'border-border bg-card shadow-sm hover:shadow-md',
+      icon: 'bg-success/10 text-success',
+      value: 'text-success',
+      label: 'text-muted-foreground',
       badge: 'bg-success text-success-foreground',
     },
     red: {
-      card: 'border-destructive/30 bg-gradient-to-br from-destructive/10 via-card to-card hover:border-destructive/50 hover:shadow-[0_0_30px_-8px_hsl(var(--destructive)/0.35)]',
-      icon: 'bg-destructive/15 text-destructive',
-      text: 'text-destructive',
+      card: 'border-border bg-card shadow-sm hover:shadow-md',
+      icon: 'bg-destructive/10 text-destructive',
+      value: 'text-destructive',
+      label: 'text-muted-foreground',
       badge: 'bg-destructive text-destructive-foreground',
     },
     yellow: {
-      card: 'border-warning/30 bg-gradient-to-br from-warning/10 via-card to-card hover:border-warning/50 hover:shadow-[0_0_30px_-8px_hsl(var(--warning)/0.35)]',
-      icon: 'bg-warning/15 text-warning',
-      text: 'text-warning',
+      card: 'border-border bg-card shadow-sm hover:shadow-md',
+      icon: 'bg-warning/10 text-warning',
+      value: 'text-foreground',
+      label: 'text-muted-foreground',
       badge: 'bg-warning text-warning-foreground',
     },
-    white: {
-      card: 'border-border/50 bg-gradient-to-br from-foreground/5 via-card to-card hover:border-border hover:shadow-[0_0_30px_-8px_hsl(var(--foreground)/0.15)]',
-      icon: 'bg-muted text-muted-foreground',
-      text: 'text-muted-foreground',
-      badge: 'bg-muted text-muted-foreground',
+    blue: {
+      card: 'border-border bg-card shadow-sm hover:shadow-md',
+      icon: 'bg-info/10 text-info',
+      value: 'text-info',
+      label: 'text-muted-foreground',
+      badge: 'bg-info/20 text-info border-info/40',
     },
     purple: {
-      card: 'border-accent/30 bg-gradient-to-br from-accent/10 via-card to-card hover:border-accent/50 hover:shadow-[0_0_30px_-8px_hsl(var(--accent)/0.35)]',
-      icon: 'bg-accent/15 text-accent',
-      text: 'text-accent',
+      card: 'border-border bg-card shadow-sm hover:shadow-md',
+      icon: 'bg-accent/10 text-accent',
+      value: 'text-accent',
+      label: 'text-muted-foreground',
       badge: 'bg-accent/20 text-accent border-accent/40',
     },
   };
@@ -129,6 +136,7 @@ export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsPro
   const items: {
     title: string;
     value: string;
+    subtitle?: string;
     icon: typeof DollarSign;
     theme: CardTheme;
     tip: string;
@@ -136,14 +144,18 @@ export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsPro
   }[] = [
     {
       title: costLabel,
-      value: `R$ ${Math.abs(montageValue).toFixed(2)}`,
+      value: `R$ ${Math.abs(montageValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+      subtitle: montageValue >= 0 ? 'débito líquido' : 'crédito líquido',
       icon: DollarSign,
-      theme: 'white',
+      theme: 'neutral',
       tip: costTip,
     },
     {
       title: 'Lucro Máximo',
-      value: maxGainValue !== null ? `R$ ${maxGainValue.toFixed(2)}` : '∞',
+      value: maxGainValue !== null ? `R$ ${maxGainValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '∞',
+      subtitle: maxGainValue !== null && investedCapital > 0
+        ? `${((maxGainValue / investedCapital) * 100).toFixed(1)}% do capital`
+        : undefined,
       icon: TrendingUp,
       theme: 'green',
       tip: maxGainTip,
@@ -152,7 +164,10 @@ export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsPro
       title: 'Risco Máximo',
       value: metrics.isRiskFree
         ? 'R$ 0,00'
-        : (maxLossValue !== null ? `R$ ${Math.abs(maxLossValue).toFixed(2)}` : '∞'),
+        : (maxLossValue !== null ? `R$ ${Math.abs(maxLossValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '∞'),
+      subtitle: metrics.isRiskFree ? 'proteção total' : (maxLossValue !== null && investedCapital > 0
+        ? `${((Math.abs(maxLossValue) / investedCapital) * 100).toFixed(1)}% do capital`
+        : undefined),
       icon: metrics.isRiskFree ? Shield : TrendingDown,
       theme: metrics.isRiskFree ? 'green' : 'red',
       tip: maxLossTip,
@@ -161,10 +176,11 @@ export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsPro
     {
       title: breakevenLabel,
       value: breakeven !== null
-        ? breakeven.map(b => `R$ ${b.toFixed(2)}`).join(' | ')
+        ? breakeven.map(b => `R$ ${b.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`).join(' | ')
         : (metrics.breakevens.length > 0
-          ? metrics.breakevens.map(b => `R$ ${b.toFixed(2)}`).join(' | ')
+          ? metrics.breakevens.map(b => `R$ ${b.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`).join(' | ')
           : 'N/A'),
+      subtitle: 'ponto de equilíbrio',
       icon: Target,
       theme: 'yellow',
       tip: breakevenTip,
@@ -172,6 +188,9 @@ export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsPro
     {
       title: 'Eficiência vs CDI',
       value: efficiency !== null ? `${efficiency.toFixed(0)}%` : 'N/A',
+      subtitle: efficiency !== null
+        ? (efficiency >= 100 ? 'supera o CDI' : 'abaixo do CDI')
+        : undefined,
       icon: Percent,
       theme: efficiency !== null && efficiency >= 100 ? 'blue' : 'purple',
       tip: 'Lucro máximo da estrutura como % do rendimento CDI no mesmo período.',
@@ -180,26 +199,37 @@ export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsPro
   ];
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
       {items.map(item => {
         const t = themeClasses[item.theme];
         return (
           <Tooltip key={item.title}>
             <TooltipTrigger asChild>
               <Card className={cn(
-                'cursor-help group relative overflow-hidden transition-all duration-300 hover:scale-[1.02]',
+                'cursor-help group relative overflow-hidden transition-all duration-200',
                 t.card
               )}>
-                <CardContent className="relative p-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{item.title}</span>
-                    <div className={cn('flex h-8 w-8 items-center justify-center rounded-lg transition-colors', t.icon)}>
-                      <item.icon className="h-4 w-4" />
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className={cn('text-xs font-medium', t.label)}>{item.title}</span>
+                    <div className={cn('flex h-7 w-7 items-center justify-center rounded-md', t.icon)}>
+                      <item.icon className="h-3.5 w-3.5" />
                     </div>
                   </div>
-                  <p className={cn('text-xl font-bold font-mono tracking-tight', t.text)}>{item.value}</p>
+                  <p className={cn('text-2xl font-bold tracking-tight leading-none', t.value)}>
+                    {item.value}
+                  </p>
+                  {item.subtitle && (
+                    <p className={cn('text-xs mt-1.5', 
+                      item.theme === 'green' ? 'text-success' : 
+                      item.theme === 'red' ? 'text-destructive' : 
+                      'text-muted-foreground'
+                    )}>
+                      {item.subtitle}
+                    </p>
+                  )}
                   {item.badge && (
-                    <Badge className={cn('mt-2 text-[10px] font-semibold tracking-wider animate-pulse', t.badge)}>
+                    <Badge className={cn('mt-2.5 text-[10px] font-semibold tracking-wider', t.badge)}>
                       {item.badge}
                     </Badge>
                   )}

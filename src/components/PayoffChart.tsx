@@ -28,8 +28,10 @@ export default function PayoffChart({ data, breakevens, cdiRate = 0, daysToExpir
     ? calculateCDIReturn(investedCapital, cdiRate, daysToExpiry, false)
     : null;
 
+  const sortedData = [...data].sort((a, b) => a.price - b.price);
+
   // Build chart data with the actual payoff line + colored zones
-  const chartData = data.map((p) => {
+  const chartData = sortedData.map((p) => {
     const profit = p.profitAtExpiry;
     const cdi = cdiValue ?? 0;
 
@@ -46,11 +48,11 @@ export default function PayoffChart({ data, breakevens, cdiRate = 0, daysToExpir
     };
   });
 
-  const prices = data.map((p) => p.price);
+  const prices = sortedData.map((p) => p.price);
   const minPrice = Math.min(...prices);
   const maxPrice = Math.max(...prices);
 
-  const profits = data.map((p) => p.profitAtExpiry);
+  const profits = sortedData.map((p) => p.profitAtExpiry);
   const allValues = [...profits, cdiValue ?? 0];
   const minProfit = Math.min(...allValues);
   const maxProfit = Math.max(...allValues);

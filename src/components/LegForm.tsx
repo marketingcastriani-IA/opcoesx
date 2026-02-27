@@ -22,7 +22,10 @@ export default function LegForm({ onAdd }: LegFormProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!leg.asset || leg.price <= 0 || (leg.option_type !== 'stock' && leg.strike <= 0)) return;
+    const isStock = leg.option_type === 'stock';
+    const hasStrike = isStock ? true : leg.strike > 0;
+    const hasPrice = isStock ? leg.price > 0 : leg.price >= 0;
+    if (!leg.asset || !hasStrike || !hasPrice || leg.quantity <= 0) return;
     onAdd({ ...leg });
     setLeg(prev => ({ ...prev, strike: 0, price: 0, quantity: 1 }));
   };
@@ -41,10 +44,7 @@ export default function LegForm({ onAdd }: LegFormProps) {
       </div>
       <div className="space-y-1">
         <Label className="text-xs">Tipo</Label>
-        <Select
-          value={leg.option_type}
-          onValueChange={v => setLeg(p => ({ ...p, option_type: v as 'call' | 'put' | 'stock', strike: v === 'stock' ? 0 : p.strike }))}
-        >
+        <Select value={leg.option_type} onValueChange={v => setLeg(p => ({ ...p, option_type: v as 'call' | 'put' | 'stock' }))}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="call">Call</SelectItem>
@@ -59,14 +59,7 @@ export default function LegForm({ onAdd }: LegFormProps) {
       </div>
       <div className="space-y-1">
         <Label className="text-xs">Strike</Label>
-        <Input
-          type="number"
-          step="0.01"
-          value={leg.strike || ''}
-          onChange={e => setLeg(p => ({ ...p, strike: parseFloat(e.target.value) || 0 }))}
-          placeholder="30.00"
-          disabled={leg.option_type === 'stock'}
-        />
+        <Input type="number" step="0.01" value={leg.strike || ''} onChange={e => setLeg(p => ({ ...p, strike: parseFloat(e.target.value) || 0 }))} placeholder="30.00" />
       </div>
       <div className="space-y-1">
         <Label className="text-xs">Preço</Label>

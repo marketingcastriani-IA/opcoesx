@@ -104,7 +104,9 @@ export default function CDIComparison({ metrics, cdiRate, setCdiRate, daysToExpi
 
   // Rótulo do breakeven
   const breakevenDisplay = metrics.realBreakeven != null
-    ? `R$ ${metrics.realBreakeven.toFixed(2)}`
+    ? (Array.isArray(metrics.realBreakeven)
+      ? metrics.realBreakeven.map(b => `R$ ${b.toFixed(2)}`).join(' | ')
+      : `R$ ${metrics.realBreakeven.toFixed(2)}`)
     : (metrics.breakevens.length > 0
       ? metrics.breakevens.map(v => `R$ ${v.toFixed(2)}`).join(' | ')
       : 'N/A');

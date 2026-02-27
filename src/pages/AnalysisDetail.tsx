@@ -432,7 +432,7 @@ export default function AnalysisDetail() {
           <CardContent>
             <PayoffChart
               data={payoffData}
-              breakevens={metrics.realBreakeven ? [metrics.realBreakeven] : metrics.breakevens}
+              breakevens={metrics.realBreakeven ? (Array.isArray(metrics.realBreakeven) ? metrics.realBreakeven : [metrics.realBreakeven]) : metrics.breakevens}
               cdiRate={cdiRate}
               daysToExpiry={daysToExpiry}
               netCost={metrics.netCost}

@@ -112,7 +112,7 @@ export default function CDIComparison({ metrics, cdiRate, setCdiRate, daysToExpi
       : 'N/A');
 
   return (
-    <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/8 to-card shadow-[0_0_40px_-12px_hsl(var(--primary)/0.2)]">
+    <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/[0.08] to-card shadow-[0_0_40px_-12px_hsl(var(--primary)/0.2)]">
       <CardHeader>
         <CardTitle className="text-2xl font-black tracking-tight flex items-center gap-3">
           📊 COMPARATIVO: ESTRATÉGIA vs CDI

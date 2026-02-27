@@ -122,7 +122,7 @@ export default function Portfolio() {
 
         {/* Stats Cards */}
         <div className="grid gap-4 sm:grid-cols-4">
-          <Card className="relative overflow-hidden border-2 border-primary/30 bg-gradient-to-br from-primary/8 to-card">
+          <Card className="relative overflow-hidden border-2 border-primary/30 bg-gradient-to-br from-primary/[0.08] to-card">
             <CardContent className="p-4 space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total P&L</p>
               <p className={cn('text-2xl font-black', stats.totalPL >= 0 ? 'text-success' : 'text-destructive')}>
@@ -132,7 +132,7 @@ export default function Portfolio() {
             </CardContent>
           </Card>
 
-          <Card className="relative overflow-hidden border-2 border-success/30 bg-gradient-to-br from-success/8 to-card">
+          <Card className="relative overflow-hidden border-2 border-success/30 bg-gradient-to-br from-success/[0.08] to-card">
             <CardContent className="p-4 space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ganhos</p>
               <p className="text-2xl font-black text-success">{stats.wins}</p>
@@ -140,7 +140,7 @@ export default function Portfolio() {
             </CardContent>
           </Card>
 
-          <Card className="relative overflow-hidden border-2 border-destructive/30 bg-gradient-to-br from-destructive/8 to-card">
+          <Card className="relative overflow-hidden border-2 border-destructive/30 bg-gradient-to-br from-destructive/[0.08] to-card">
             <CardContent className="p-4 space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Perdas</p>
               <p className="text-2xl font-black text-destructive">{stats.losses}</p>
@@ -148,7 +148,7 @@ export default function Portfolio() {
             </CardContent>
           </Card>
 
-          <Card className="relative overflow-hidden border-2 border-primary/30 bg-gradient-to-br from-primary/8 to-card">
+          <Card className="relative overflow-hidden border-2 border-primary/30 bg-gradient-to-br from-primary/[0.08] to-card">
             <CardContent className="p-4 space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Taxa de Acerto</p>
               <p className="text-2xl font-black text-primary">{stats.winRate}%</p>

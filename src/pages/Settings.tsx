@@ -81,7 +81,7 @@ export default function Settings() {
         </div>
 
         {/* Account Info */}
-        <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/8 to-card">
+        <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/[0.08] to-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5 text-primary" />
@@ -116,7 +116,7 @@ export default function Settings() {
         </Card>
 
         {/* Change Password */}
-        <Card className="border-2 border-warning/30 bg-gradient-to-br from-warning/8 to-card">
+        <Card className="border-2 border-warning/30 bg-gradient-to-br from-warning/[0.08] to-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Lock className="h-5 w-5 text-warning" />
@@ -169,7 +169,7 @@ export default function Settings() {
         </Card>
 
         {/* Danger Zone */}
-        <Card className="border-2 border-destructive/30 bg-gradient-to-br from-destructive/8 to-card">
+        <Card className="border-2 border-destructive/30 bg-gradient-to-br from-destructive/[0.08] to-card">
           <CardHeader>
             <CardTitle className="text-destructive">Zona de Perigo</CardTitle>
           </CardHeader>

@@ -10,7 +10,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import History from "./pages/History";
 import AnalysisDetail from "./pages/AnalysisDetail";
-import Portfolio from "./components/Portfolio";
+import Portfolio from "./pages/Portfolio";
 import Settings from "./pages/Settings";
 import AdminLogin from "./pages/AdminLogin";
 import AdminPanel from "./pages/AdminPanel";

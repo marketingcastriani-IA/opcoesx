@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import {
   Loader2, ArrowLeft, Save, XCircle, Sparkles, Plus, Trash2,
-  TrendingUp, TrendingDown, AlertTriangle, Clock, CheckCircle2, ShieldAlert, Edit2
+  TrendingUp, TrendingDown, AlertTriangle, Clock, CheckCircle2, ShieldAlert, Edit2, RotateCcw
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -302,15 +302,26 @@ export default function AnalysisDetail() {
   };
 
   const closeOperation = async () => {
+    if (!confirm('Encerrar esta operação e enviar para o portfólio?')) return;
     setClosing(true);
     try {
-      await supabase.from('analyses').update({ status: 'closed' } as any).eq('id', id!);
+      await supabase.from('analyses').update({ status: 'closed', closed_at: new Date().toISOString() } as any).eq('id', id!);
       setAnalysis(prev => prev ? { ...prev, status: 'closed' } : prev);
-      toast.success('Operação encerrada!');
+      toast.success('Operação encerrada e enviada para o portfólio!');
     } catch (err: any) {
       toast.error('Erro: ' + err.message);
     } finally {
       setClosing(false);
+    }
+  };
+
+  const reopenOperation = async () => {
+    try {
+      await supabase.from('analyses').update({ status: 'active', closed_at: null } as any).eq('id', id!);
+      setAnalysis(prev => prev ? { ...prev, status: 'active' } : prev);
+      toast.success('Operação reaberta!');
+    } catch (err: any) {
+      toast.error('Erro: ' + err.message);
     }
   };
 
@@ -421,10 +432,15 @@ export default function AnalysisDetail() {
               {loadingAI ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
               Sugestão IA
             </Button>
-            {analysis.status === 'active' && (
+            {analysis.status === 'active' ? (
               <Button variant="destructive" size="sm" onClick={closeOperation} disabled={closing}>
                 {closing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />}
                 Encerrar Operação
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" onClick={reopenOperation}>
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Reabrir Operação
               </Button>
             )}
           </div>
@@ -608,7 +624,6 @@ export default function AnalysisDetail() {
                             onChange={e => updateCurrentPrice(leg.id, e.target.value)}
                             className="w-24 h-8 text-right text-sm ml-auto"
                             placeholder="0.00"
-                            disabled={analysis.status !== 'active'}
                           />
                         </td>
                         <td className="py-2 text-right font-medium">
@@ -677,14 +692,12 @@ export default function AnalysisDetail() {
                 )}
               </table>
             </div>
-            {analysis.status === 'active' && (
-              <div className="flex justify-end mt-4">
-                <Button size="sm" onClick={saveCurrentPrices} disabled={saving}>
-                  {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                  Salvar Preços Atuais
-                </Button>
-              </div>
-            )}
+            <div className="flex justify-end mt-4">
+              <Button size="sm" onClick={saveCurrentPrices} disabled={saving}>
+                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                Salvar Preços Atuais
+              </Button>
+            </div>
           </CardContent>
         </Card>
 

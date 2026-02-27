@@ -118,6 +118,7 @@ export default function PayoffChart({ data, breakevens, cdiRate = 0, daysToExpir
         {breakevens.map((be, i) => (
           <ReferenceLine
             key={i}
+            yAxisId="left"
             x={be}
             stroke="hsl(var(--warning))"
             strokeDasharray="6 4"

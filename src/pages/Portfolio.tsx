@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, TrendingDown, Trash2, Plus, Calendar, DollarSign, Loader2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, Trash2, Plus, Calendar, DollarSign, Loader2, Edit2, Save, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ClosedOperation {
@@ -38,6 +38,7 @@ export default function Portfolio() {
 
   const [showForm, setShowForm] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     asset: '',
@@ -57,20 +58,49 @@ export default function Portfolio() {
   const handleAddOperation = () => {
     if (!formData.name || !formData.asset || formData.profitLoss === 0) return;
 
-    const newOp: ClosedOperation = {
-      id: Date.now().toString(),
-      name: formData.name,
-      asset: formData.asset,
-      entryDate: formData.entryDate,
-      exitDate: formData.exitDate,
-      profitLoss: formData.profitLoss,
-      percentage: ((formData.profitLoss / Math.abs(formData.profitLoss)) * 2.5),
-      strategy: formData.strategy,
-    };
+    if (editingId) {
+      // Update existing operation
+      setOperations(operations.map(op => op.id === editingId ? {
+        ...op,
+        name: formData.name,
+        asset: formData.asset,
+        entryDate: formData.entryDate,
+        exitDate: formData.exitDate,
+        profitLoss: formData.profitLoss,
+        percentage: ((formData.profitLoss / Math.abs(formData.profitLoss)) * 2.5),
+        strategy: formData.strategy,
+      } : op));
+      setEditingId(null);
+    } else {
+      // Add new operation
+      const newOp: ClosedOperation = {
+        id: Date.now().toString(),
+        name: formData.name,
+        asset: formData.asset,
+        entryDate: formData.entryDate,
+        exitDate: formData.exitDate,
+        profitLoss: formData.profitLoss,
+        percentage: ((formData.profitLoss / Math.abs(formData.profitLoss)) * 2.5),
+        strategy: formData.strategy,
+      };
+      setOperations([...operations, newOp]);
+    }
 
-    setOperations([...operations, newOp]);
     setFormData({ name: '', asset: '', entryDate: '', exitDate: '', profitLoss: 0, strategy: '' });
     setShowForm(false);
+  };
+
+  const handleEdit = (op: ClosedOperation) => {
+    setFormData({
+      name: op.name,
+      asset: op.asset,
+      entryDate: op.entryDate,
+      exitDate: op.exitDate,
+      profitLoss: op.profitLoss,
+      strategy: op.strategy,
+    });
+    setEditingId(op.id);
+    setShowForm(true);
   };
 
   const handleDelete = (id: string) => {
@@ -80,6 +110,12 @@ export default function Portfolio() {
       setOperations(operations.filter(op => op.id !== id));
       setDeleting(null);
     }, 300);
+  };
+
+  const handleCancel = () => {
+    setFormData({ name: '', asset: '', entryDate: '', exitDate: '', profitLoss: 0, strategy: '' });
+    setEditingId(null);
+    setShowForm(false);
   };
 
   if (authLoading) return null;
@@ -134,18 +170,24 @@ export default function Portfolio() {
 
         {/* Add Operation Button */}
         <Button
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => {
+            if (!showForm) {
+              setFormData({ name: '', asset: '', entryDate: '', exitDate: '', profitLoss: 0, strategy: '' });
+              setEditingId(null);
+            }
+            setShowForm(!showForm);
+          }}
           className="text-base h-11 px-6 shadow-[0_0_30px_-8px_hsl(var(--primary)/0.4)]"
         >
           <Plus className="mr-2 h-5 w-5" />
-          Nova Operação Encerrada
+          {editingId ? 'Editar Operação' : 'Nova Operação Encerrada'}
         </Button>
 
-        {/* Add Form */}
+        {/* Add/Edit Form */}
         {showForm && (
           <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-card">
             <CardHeader>
-              <CardTitle>Registrar Operação Encerrada</CardTitle>
+              <CardTitle>{editingId ? 'Editar Operação Encerrada' : 'Registrar Operação Encerrada'}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -201,8 +243,14 @@ export default function Portfolio() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button onClick={handleAddOperation} className="flex-1">Salvar</Button>
-                <Button onClick={() => setShowForm(false)} variant="outline" className="flex-1">Cancelar</Button>
+                <Button onClick={handleAddOperation} className="flex-1">
+                  <Save className="mr-2 h-4 w-4" />
+                  {editingId ? 'Atualizar' : 'Salvar'}
+                </Button>
+                <Button onClick={handleCancel} variant="outline" className="flex-1">
+                  <X className="mr-2 h-4 w-4" />
+                  Cancelar
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -248,19 +296,29 @@ export default function Portfolio() {
                     </p>
                   </div>
 
-                  <Button
-                    onClick={() => handleDelete(op.id)}
-                    variant="ghost"
-                    size="sm"
-                    disabled={deleting === op.id}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    {deleting === op.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    )}
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button
+                      onClick={() => handleEdit(op)}
+                      variant="ghost"
+                      size="sm"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Edit2 className="h-4 w-4 text-primary" />
+                    </Button>
+                    <Button
+                      onClick={() => handleDelete(op.id)}
+                      variant="ghost"
+                      size="sm"
+                      disabled={deleting === op.id}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      {deleting === op.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>

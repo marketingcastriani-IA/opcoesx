@@ -44,40 +44,40 @@
   }
 
   .dark {
-    --background: 220 25% 6%;
-    --foreground: 210 20% 92%;
-    --card: 220 25% 9%;
-    --card-foreground: 210 20% 92%;
-    --popover: 220 25% 9%;
-    --popover-foreground: 210 20% 92%;
-    --primary: 152 60% 45%;
-    --primary-foreground: 220 25% 6%;
-    --secondary: 220 20% 15%;
-    --secondary-foreground: 210 20% 92%;
-    --muted: 220 20% 13%;
-    --muted-foreground: 220 10% 55%;
-    --accent: 152 60% 45%;
-    --accent-foreground: 220 25% 6%;
+    --background: 0 0% 8%;
+    --foreground: 0 0% 95%;
+    --card: 0 0% 12%;
+    --card-foreground: 0 0% 95%;
+    --popover: 0 0% 12%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 152 70% 50%;
+    --primary-foreground: 0 0% 8%;
+    --secondary: 0 0% 20%;
+    --secondary-foreground: 0 0% 95%;
+    --muted: 0 0% 18%;
+    --muted-foreground: 0 0% 60%;
+    --accent: 38 92% 50%;
+    --accent-foreground: 0 0% 8%;
     --destructive: 0 62% 45%;
     --destructive-foreground: 0 0% 100%;
-    --success: 152 60% 45%;
-    --success-foreground: 220 25% 6%;
+    --success: 152 70% 50%;
+    --success-foreground: 0 0% 8%;
     --warning: 38 92% 50%;
-    --warning-foreground: 220 25% 6%;
-    --border: 220 20% 16%;
-    --input: 220 20% 16%;
-    --ring: 152 60% 45%;
-    --sidebar-background: 220 25% 8%;
-    --sidebar-foreground: 210 15% 75%;
-    --sidebar-primary: 152 60% 45%;
-    --sidebar-primary-foreground: 220 25% 6%;
-    --sidebar-accent: 220 20% 13%;
-    --sidebar-accent-foreground: 210 20% 92%;
-    --sidebar-border: 220 20% 14%;
-    --sidebar-ring: 152 60% 45%;
-    --chart-profit: 152 60% 45%;
+    --warning-foreground: 0 0% 8%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 152 70% 50%;
+    --sidebar-background: 0 0% 10%;
+    --sidebar-foreground: 0 0% 85%;
+    --sidebar-primary: 152 70% 50%;
+    --sidebar-primary-foreground: 0 0% 8%;
+    --sidebar-accent: 0 0% 18%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 0 0% 18%;
+    --sidebar-ring: 152 70% 50%;
+    --chart-profit: 152 70% 50%;
     --chart-loss: 0 62% 45%;
-    --chart-neutral: 220 10% 50%;
+    --chart-neutral: 0 0% 50%;
   }
 }
 

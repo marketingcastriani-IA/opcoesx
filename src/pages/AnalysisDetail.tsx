@@ -13,11 +13,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import {
-  Loader2, ArrowLeft, Save, XCircle, Sparkles,
-  TrendingUp, TrendingDown, AlertTriangle, Clock, CheckCircle2, ShieldAlert
+  Loader2, ArrowLeft, Save, XCircle, Sparkles, Plus, Trash2,
+  TrendingUp, TrendingDown, AlertTriangle, Clock, CheckCircle2, ShieldAlert, Edit2
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface DbLeg {
   id: string;
@@ -145,6 +147,18 @@ export default function AnalysisDetail() {
   const [aiSuggestion, setAiSuggestion] = useState('');
   const [cdiRate, setCdiRate] = useState(14.90);
   const [daysToExpiry, setDaysToExpiry] = useState(0);
+  const [editingLegId, setEditingLegId] = useState<string | null>(null);
+  const [editingAnalysisName, setEditingAnalysisName] = useState(false);
+  const [newAnalysisName, setNewAnalysisName] = useState('');
+  const [showAddLegForm, setShowAddLegForm] = useState(false);
+  const [newLeg, setNewLeg] = useState<Partial<DbLeg>>({
+    side: 'buy',
+    option_type: 'call',
+    asset: '',
+    strike: 0,
+    price: 0,
+    quantity: 1,
+  });
 
   useEffect(() => {
     if (!user || !id) return;
@@ -155,6 +169,7 @@ export default function AnalysisDetail() {
       if (aRes.data) {
         const a = aRes.data as unknown as DbAnalysis;
         setAnalysis(a);
+        setNewAnalysisName(a.name);
         setCdiRate(a.cdi_rate ?? 14.90);
         setDaysToExpiry(a.days_to_expiry ?? 0);
         setAiSuggestion(a.ai_suggestion ?? '');
@@ -212,6 +227,63 @@ export default function AnalysisDetail() {
     setCurrentPrices(prev => ({ ...prev, [legId]: value }));
   }, []);
 
+  const updateLegField = async (legId: string, field: string, value: any) => {
+    try {
+      await supabase.from('legs').update({ [field]: value }).eq('id', legId);
+      setDbLegs(prev => prev.map(l => l.id === legId ? { ...l, [field]: value } : l));
+      toast.success('Perna atualizada!');
+      setEditingLegId(null);
+    } catch (err: any) {
+      toast.error('Erro ao atualizar: ' + err.message);
+    }
+  };
+
+  const deleteLeg = async (legId: string) => {
+    if (!confirm('Tem certeza que deseja deletar esta perna?')) return;
+    try {
+      await supabase.from('legs').delete().eq('id', legId);
+      setDbLegs(prev => prev.filter(l => l.id !== legId));
+      toast.success('Perna deletada!');
+    } catch (err: any) {
+      toast.error('Erro ao deletar: ' + err.message);
+    }
+  };
+
+  const addNewLeg = async () => {
+    if (!newLeg.asset || !newLeg.price || newLeg.quantity === undefined) {
+      toast.error('Preencha todos os campos obrigatórios');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.from('legs').insert({
+        analysis_id: id,
+        side: newLeg.side,
+        option_type: newLeg.option_type,
+        asset: newLeg.asset,
+        strike: newLeg.option_type === 'stock' ? newLeg.price : newLeg.strike,
+        price: newLeg.price,
+        quantity: newLeg.quantity,
+      }).select().single();
+
+      if (error) throw error;
+
+      setDbLegs(prev => [...prev, data as DbLeg]);
+      setNewLeg({
+        side: 'buy',
+        option_type: 'call',
+        asset: '',
+        strike: 0,
+        price: 0,
+        quantity: 1,
+      });
+      setShowAddLegForm(false);
+      toast.success('Perna adicionada!');
+    } catch (err: any) {
+      toast.error('Erro ao adicionar: ' + err.message);
+    }
+  };
+
   const saveCurrentPrices = async () => {
     setSaving(true);
     try {
@@ -239,6 +311,17 @@ export default function AnalysisDetail() {
       toast.error('Erro: ' + err.message);
     } finally {
       setClosing(false);
+    }
+  };
+
+  const updateAnalysisName = async () => {
+    try {
+      await supabase.from('analyses').update({ name: newAnalysisName }).eq('id', id!);
+      setAnalysis(prev => prev ? { ...prev, name: newAnalysisName } : prev);
+      toast.success('Nome atualizado!');
+      setEditingAnalysisName(false);
+    } catch (err: any) {
+      toast.error('Erro: ' + err.message);
     }
   };
 
@@ -302,12 +385,32 @@ export default function AnalysisDetail() {
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold">{analysis.name}</h1>
-                <Badge variant={analysis.status === 'active' ? 'default' : 'secondary'}>
-                  {analysis.status === 'active' ? 'Ativa' : 'Encerrada'}
-                </Badge>
-              </div>
+              {editingAnalysisName ? (
+                <div className="flex gap-2">
+                  <Input
+                    value={newAnalysisName}
+                    onChange={(e) => setNewAnalysisName(e.target.value)}
+                    className="max-w-xs"
+                  />
+                  <Button size="sm" onClick={updateAnalysisName}>Salvar</Button>
+                  <Button size="sm" variant="outline" onClick={() => setEditingAnalysisName(false)}>Cancelar</Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <h1 className="text-2xl font-bold">{analysis.name}</h1>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => setEditingAnalysisName(true)}
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <Badge variant={analysis.status === 'active' ? 'default' : 'secondary'}>
+                    {analysis.status === 'active' ? 'Ativa' : 'Encerrada'}
+                  </Badge>
+                </div>
+              )}
               <p className="text-xs text-muted-foreground">
                 {analysis.underlying_asset} · {new Date(analysis.created_at).toLocaleDateString('pt-BR')}
               </p>
@@ -329,10 +432,92 @@ export default function AnalysisDetail() {
 
         {/* Legs with editable current prices */}
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base">Pernas da Estratégia — Preços Atuais</CardTitle>
+            {analysis.status === 'active' && (
+              <Button size="sm" onClick={() => setShowAddLegForm(!showAddLegForm)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Nova Perna
+              </Button>
+            )}
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            {/* Add Leg Form */}
+            {showAddLegForm && (
+              <div className="border-2 border-primary/30 rounded-lg p-4 space-y-4 bg-primary/5">
+                <h3 className="font-semibold">Adicionar Nova Perna</h3>
+                <div className="grid gap-3 sm:grid-cols-5 items-end">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold uppercase">Lado</label>
+                    <Select value={newLeg.side as string} onValueChange={v => setNewLeg(p => ({ ...p, side: v }))}>
+                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="buy">Compra</SelectItem>
+                        <SelectItem value="sell">Venda</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold uppercase">Tipo</label>
+                    <Select value={newLeg.option_type as string} onValueChange={v => setNewLeg(p => ({ ...p, option_type: v }))}>
+                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="call">Call</SelectItem>
+                        <SelectItem value="put">Put</SelectItem>
+                        <SelectItem value="stock">Ativo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold uppercase">Ativo</label>
+                    <Input
+                      value={newLeg.asset || ''}
+                      onChange={e => setNewLeg(p => ({ ...p, asset: e.target.value.toUpperCase() }))}
+                      placeholder="PETR4"
+                      className="h-9"
+                    />
+                  </div>
+                  {newLeg.option_type !== 'stock' && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold uppercase">Strike</label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={newLeg.strike || ''}
+                        onChange={e => setNewLeg(p => ({ ...p, strike: parseFloat(e.target.value) || 0 }))}
+                        className="h-9"
+                      />
+                    </div>
+                  )}
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold uppercase">Preço</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={newLeg.price || ''}
+                      onChange={e => setNewLeg(p => ({ ...p, price: parseFloat(e.target.value) || 0 }))}
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold uppercase">Qtd</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={newLeg.quantity || 1}
+                      onChange={e => setNewLeg(p => ({ ...p, quantity: parseInt(e.target.value) || 1 }))}
+                      className="h-9"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={addNewLeg}>Adicionar</Button>
+                  <Button size="sm" variant="outline" onClick={() => setShowAddLegForm(false)}>Cancelar</Button>
+                </div>
+              </div>
+            )}
+
+            {/* Legs Table */}
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -342,8 +527,10 @@ export default function AnalysisDetail() {
                     <th className="text-left py-2">Lado</th>
                     <th className="text-right py-2">Strike</th>
                     <th className="text-right py-2">Preço Original</th>
+                    <th className="text-right py-2">Qtd</th>
                     <th className="text-right py-2">Preço Atual</th>
                     <th className="text-right py-2">P&L</th>
+                    <th className="text-right py-2">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -352,9 +539,20 @@ export default function AnalysisDetail() {
                     const pnl = !isNaN(cp)
                       ? (leg.side === 'buy' ? 1 : -1) * (cp - leg.price) * leg.quantity
                       : null;
+                    const isStock = leg.option_type === 'stock';
                     return (
-                      <tr key={leg.id} className="border-b border-border/30">
-                        <td className="py-2 font-medium">{leg.asset}</td>
+                      <tr key={leg.id} className={cn("border-b border-border/30", isStock && "bg-primary/5")}>
+                        <td className="py-2 font-medium">
+                          {editingLegId === leg.id ? (
+                            <Input
+                              value={leg.asset}
+                              onChange={e => setDbLegs(prev => prev.map(l => l.id === leg.id ? { ...l, asset: e.target.value.toUpperCase() } : l))}
+                              className="h-8 w-20"
+                            />
+                          ) : (
+                            leg.asset
+                          )}
+                        </td>
                         <td className="py-2">
                           <Badge variant="outline" className="text-[10px]">
                             {leg.option_type.toUpperCase()}
@@ -365,8 +563,45 @@ export default function AnalysisDetail() {
                             {leg.side === 'buy' ? 'Compra' : 'Venda'}
                           </Badge>
                         </td>
-                        <td className="py-2 text-right">{leg.strike.toFixed(2)}</td>
-                        <td className="py-2 text-right">{leg.price.toFixed(2)}</td>
+                        <td className="py-2 text-right">
+                          {editingLegId === leg.id && !isStock ? (
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={leg.strike}
+                              onChange={e => setDbLegs(prev => prev.map(l => l.id === leg.id ? { ...l, strike: parseFloat(e.target.value) || 0 } : l))}
+                              className="h-8 w-24 text-right"
+                            />
+                          ) : (
+                            leg.strike.toFixed(2)
+                          )}
+                        </td>
+                        <td className="py-2 text-right">
+                          {editingLegId === leg.id ? (
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={leg.price}
+                              onChange={e => setDbLegs(prev => prev.map(l => l.id === leg.id ? { ...l, price: parseFloat(e.target.value) || 0 } : l))}
+                              className="h-8 w-24 text-right"
+                            />
+                          ) : (
+                            leg.price.toFixed(2)
+                          )}
+                        </td>
+                        <td className="py-2 text-right">
+                          {editingLegId === leg.id ? (
+                            <Input
+                              type="number"
+                              min={1}
+                              value={leg.quantity}
+                              onChange={e => setDbLegs(prev => prev.map(l => l.id === leg.id ? { ...l, quantity: parseInt(e.target.value) || 1 } : l))}
+                              className="h-8 w-20 text-right"
+                            />
+                          ) : (
+                            leg.quantity
+                          )}
+                        </td>
                         <td className="py-2 text-right">
                           <Input
                             type="number"
@@ -385,6 +620,47 @@ export default function AnalysisDetail() {
                             </span>
                           ) : '—'}
                         </td>
+                        <td className="py-2 text-right space-x-1">
+                          {editingLegId === leg.id ? (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2"
+                                onClick={() => updateLegField(leg.id, 'price', leg.price)}
+                              >
+                                Salvar
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2"
+                                onClick={() => setEditingLegId(null)}
+                              >
+                                Cancelar
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2"
+                                onClick={() => setEditingLegId(leg.id)}
+                              >
+                                <Edit2 className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2"
+                                onClick={() => deleteLeg(leg.id)}
+                              >
+                                <Trash2 className="h-3 w-3 text-destructive" />
+                              </Button>
+                            </>
+                          )}
+                        </td>
                       </tr>
                     );
                   })}
@@ -392,7 +668,7 @@ export default function AnalysisDetail() {
                 {hasCurrentPrices && (
                   <tfoot>
                     <tr className="font-bold">
-                      <td colSpan={6} className="py-2 text-right">P&L Total:</td>
+                      <td colSpan={7} className="py-2 text-right">P&L Total:</td>
                       <td className="py-2 text-right">
                         <span className={currentPnL >= 0 ? 'text-emerald-400' : 'text-red-400'}>
                           R$ {currentPnL >= 0 ? '+' : ''}{currentPnL.toFixed(2)}

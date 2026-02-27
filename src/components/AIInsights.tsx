@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { AnalysisMetrics } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Brain, TrendingUp, AlertCircle, CheckCircle2, Zap } from 'lucide-react';
+import { Brain, TrendingUp, AlertCircle, CheckCircle2, Zap, Lightbulb } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface AIInsightsProps {
@@ -94,7 +94,7 @@ export default function AIInsights({
       if (strategyInsights[metrics.strategyType]) {
         result.push({
           type: 'primary',
-          icon: Zap,
+          icon: Lightbulb,
           title: `${metrics.strategyLabel || metrics.strategyType}`,
           description: strategyInsights[metrics.strategyType],
           badge: 'ESTRATÉGIA',
@@ -106,58 +106,66 @@ export default function AIInsights({
   }, [metrics, cdiReturn]);
 
   const typeColors = {
-    success: 'from-success/10 to-success/5 border-success/20',
-    warning: 'from-warning/10 to-warning/5 border-warning/20',
-    destructive: 'from-destructive/10 to-destructive/5 border-destructive/20',
-    primary: 'from-primary/10 to-primary/5 border-primary/20',
+    success: 'from-success/15 to-success/5 border-success/30',
+    warning: 'from-warning/15 to-warning/5 border-warning/30',
+    destructive: 'from-destructive/15 to-destructive/5 border-destructive/30',
+    primary: 'from-primary/15 to-primary/5 border-primary/30',
   };
 
   const badgeColors = {
-    success: 'bg-success/20 text-success hover:bg-success/30',
-    warning: 'bg-warning/20 text-warning hover:bg-warning/30',
-    destructive: 'bg-destructive/20 text-destructive hover:bg-destructive/30',
-    primary: 'bg-primary/20 text-primary hover:bg-primary/30',
+    success: 'bg-success/25 text-success hover:bg-success/35 border-success/40',
+    warning: 'bg-warning/25 text-warning hover:bg-warning/35 border-warning/40',
+    destructive: 'bg-destructive/25 text-destructive hover:bg-destructive/35 border-destructive/40',
+    primary: 'bg-primary/25 text-primary hover:bg-primary/35 border-primary/40',
   };
 
   return (
-    <div className="space-y-4">
-      {/* IA Suggestion Card */}
-      <Card className="relative overflow-hidden border-2 border-primary/30 bg-gradient-to-br from-primary/5 via-card to-card shadow-[0_0_40px_-8px_hsl(var(--primary)/0.2)]">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl -mr-16 -mt-16" />
+    <div className="space-y-6">
+      {/* IA Suggestion Card - Premium */}
+      <Card className="relative overflow-hidden border-2 border-primary/40 bg-gradient-to-br from-primary/8 via-card to-card shadow-[0_0_60px_-12px_hsl(var(--primary)/0.3)]">
+        <div className="absolute top-0 right-0 w-40 h-40 bg-primary/15 rounded-full blur-3xl -mr-20 -mt-20 animate-pulse" />
+        <div className="absolute bottom-0 left-1/4 w-32 h-32 bg-primary/10 rounded-full blur-2xl -mb-16 animate-pulse" style={{ animationDelay: '1s' }} />
         
-        <CardHeader className="relative">
+        <CardHeader className="relative pb-3">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20">
-              <Brain className="h-5 w-5 text-primary" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary/30 to-primary/15 shadow-lg">
+              <Brain className="h-6 w-6 text-primary" />
             </div>
-            <CardTitle className="text-xl">Análise da IA</CardTitle>
+            <div>
+              <CardTitle className="text-2xl font-black tracking-tight">Análise de IA</CardTitle>
+              <p className="text-xs text-muted-foreground font-medium mt-1">Recomendação inteligente da estrutura</p>
+            </div>
           </div>
         </CardHeader>
 
         <CardContent className="relative space-y-4">
           {loading ? (
-            <div className="flex items-center gap-3 py-4">
-              <div className="h-3 w-3 rounded-full bg-primary animate-pulse" />
-              <p className="text-sm text-muted-foreground">Analisando estrutura...</p>
+            <div className="flex items-center gap-3 py-6">
+              <div className="flex gap-1">
+                <div className="h-2 w-2 rounded-full bg-primary animate-bounce" />
+                <div className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0.2s' }} />
+                <div className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0.4s' }} />
+              </div>
+              <p className="text-sm font-medium text-muted-foreground">Analisando estrutura...</p>
             </div>
           ) : suggestion ? (
-            <div className="space-y-3">
-              <p className="text-base leading-relaxed text-foreground">{suggestion}</p>
-              <div className="pt-2 border-t border-primary/10">
-                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-                  Período de análise: {daysToExpiry} dias úteis
+            <div className="space-y-4">
+              <p className="text-base leading-relaxed text-foreground font-medium">{suggestion}</p>
+              <div className="pt-3 border-t border-primary/15">
+                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-widest">
+                  📅 Período: {daysToExpiry} dias úteis
                 </p>
               </div>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground italic">Clique em "Sugestão IA" para obter uma análise.</p>
+            <p className="text-sm text-muted-foreground italic py-4">Clique em "Sugestão IA" para obter uma análise profunda.</p>
           )}
         </CardContent>
       </Card>
 
-      {/* Insights Grid */}
+      {/* Insights Grid - Ultra Modern */}
       {insights.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2">
           {insights.map((insight, idx) => {
             const Icon = insight.icon;
             const bgClass = typeColors[insight.type as keyof typeof typeColors];
@@ -167,29 +175,46 @@ export default function AIInsights({
               <Card
                 key={idx}
                 className={cn(
-                  'relative overflow-hidden border transition-all duration-300 hover:shadow-[0_10px_30px_-8px_hsl(var(--primary)/0.15)]',
+                  'relative overflow-hidden border-2 transition-all duration-500 group',
+                  'hover:shadow-[0_20px_50px_-12px_hsl(var(--primary)/0.25)]',
+                  'hover:-translate-y-1 cursor-default',
                   `bg-gradient-to-br ${bgClass}`
                 )}
               >
-                <CardContent className="p-4 space-y-3">
+                {/* Animated gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-primary/[0.03] opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                
+                {/* Glow effect */}
+                <div className={cn(
+                  'absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl opacity-0 group-hover:opacity-20 transition-opacity duration-500',
+                  insight.type === 'success' && 'bg-success',
+                  insight.type === 'warning' && 'bg-warning',
+                  insight.type === 'destructive' && 'bg-destructive',
+                  insight.type === 'primary' && 'bg-primary',
+                )} />
+
+                <CardContent className="p-5 space-y-4 relative">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted/50">
-                      <Icon className={cn(
-                        'h-4 w-4',
-                        insight.type === 'success' && 'text-success',
-                        insight.type === 'warning' && 'text-warning',
-                        insight.type === 'destructive' && 'text-destructive',
-                        insight.type === 'primary' && 'text-primary',
-                      )} />
+                    <div className={cn(
+                      'flex h-10 w-10 items-center justify-center rounded-lg transition-all duration-300 group-hover:scale-110',
+                      insight.type === 'success' && 'bg-success/20 text-success',
+                      insight.type === 'warning' && 'bg-warning/20 text-warning',
+                      insight.type === 'destructive' && 'bg-destructive/20 text-destructive',
+                      insight.type === 'primary' && 'bg-primary/20 text-primary',
+                    )}>
+                      <Icon className="h-5 w-5" />
                     </div>
-                    <Badge className={badgeClass} variant="secondary" style={{ fontSize: '0.65rem' }}>
+                    <Badge 
+                      className={cn('text-xs font-bold tracking-wider border', badgeClass)}
+                      variant="outline"
+                    >
                       {insight.badge}
                     </Badge>
                   </div>
 
-                  <div className="space-y-1">
-                    <h3 className="font-semibold text-sm leading-tight">{insight.title}</h3>
-                    <p className="text-xs text-muted-foreground leading-relaxed">{insight.description}</p>
+                  <div className="space-y-2">
+                    <h3 className="font-bold text-base leading-tight group-hover:text-primary transition-colors duration-300">{insight.title}</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{insight.description}</p>
                   </div>
                 </CardContent>
               </Card>

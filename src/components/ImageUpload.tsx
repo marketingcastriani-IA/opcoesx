@@ -8,9 +8,10 @@ import { cn } from '@/lib/utils';
 
 interface ImageUploadProps {
   onLegsExtracted: (legs: Leg[]) => void;
+  onImageChange?: () => void;
 }
 
-export default function ImageUpload({ onLegsExtracted }: ImageUploadProps) {
+export default function ImageUpload({ onLegsExtracted, onImageChange }: ImageUploadProps) {
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
@@ -54,6 +55,9 @@ export default function ImageUpload({ onLegsExtracted }: ImageUploadProps) {
       return;
     }
 
+    // Notificar que a imagem está sendo trocada (para limpar pernas antigas)
+    onImageChange?.();
+
     const reader = new FileReader();
     reader.onload = (e) => {
       const result = e.target?.result as string;
@@ -65,7 +69,7 @@ export default function ImageUpload({ onLegsExtracted }: ImageUploadProps) {
       processImage(result);
     };
     reader.readAsDataURL(file);
-  }, [processImage]);
+  }, [processImage, onImageChange]);
 
   const handleClipboardItems = useCallback((items: DataTransferItemList | undefined | null) => {
     if (!items) return false;
@@ -163,6 +167,7 @@ export default function ImageUpload({ onLegsExtracted }: ImageUploadProps) {
                 onClick={(e) => {
                   e.stopPropagation();
                   setPreview(null);
+                  onImageChange?.();
                   if (fileInputRef.current) fileInputRef.current.value = '';
                 }}
               >

@@ -246,7 +246,10 @@ export default function Dashboard() {
                 <CardContent><LegForm onAdd={addLeg} /></CardContent>
               </Card>
             ) : (
-              <ImageUpload onLegsExtracted={handleLegsFromImage} />
+              <ImageUpload 
+                onLegsExtracted={handleLegsFromImage}
+                onImageChange={() => setLegs([])}
+              />
             )}
           </div>
         )}

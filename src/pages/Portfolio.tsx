@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import Header from '@/components/Header';
@@ -23,18 +23,14 @@ interface ClosedOperation {
 
 export default function Portfolio() {
   const { user, loading: authLoading } = useAuth();
-  const [operations, setOperations] = useState<ClosedOperation[]>([
-    {
-      id: '1',
-      name: 'Compra Coberta PETR4',
-      asset: 'PETR4',
-      entryDate: '2024-01-15',
-      exitDate: '2024-02-15',
-      profitLoss: 850.00,
-      percentage: 2.2,
-      strategy: 'Covered Call',
-    },
-  ]);
+  const [operations, setOperations] = useState<ClosedOperation[]>(() => {
+    try {
+      const saved = localStorage.getItem('portfolio_operations');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
 
   const [showForm, setShowForm] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -70,7 +66,9 @@ export default function Portfolio() {
       strategy: formData.strategy,
     };
 
-    setOperations([...operations, newOp]);
+    const updatedOperations = [...operations, newOp];
+    setOperations(updatedOperations);
+    localStorage.setItem('portfolio_operations', JSON.stringify(updatedOperations));
     setFormData({ name: '', asset: '', entryDate: '', exitDate: '', profitLoss: 0, strategy: '' });
     setShowForm(false);
   };
@@ -79,10 +77,16 @@ export default function Portfolio() {
     if (!confirm('Tem certeza que deseja deletar esta operação?')) return;
     setDeleting(id);
     setTimeout(() => {
-      setOperations(operations.filter(op => op.id !== id));
+      const updatedOperations = operations.filter(op => op.id !== id);
+      setOperations(updatedOperations);
+      localStorage.setItem('portfolio_operations', JSON.stringify(updatedOperations));
       setDeleting(null);
     }, 300);
   };
+
+  useEffect(() => {
+    localStorage.setItem('portfolio_operations', JSON.stringify(operations));
+  }, [operations]);
 
   if (authLoading) return null;
   if (!user) return <Navigate to="/auth" replace />;

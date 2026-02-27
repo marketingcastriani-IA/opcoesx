@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { Loader2, Lock, Mail, LogOut, Shield } from 'lucide-react';
 
 export default function Settings() {
-  const { user, loading: authLoading, logout } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
   const navigate = useNavigate();
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -57,7 +57,7 @@ export default function Settings() {
 
   const handleLogout = async () => {
     try {
-      await logout();
+      await signOut();
       navigate('/auth');
       toast.success('Desconectado com sucesso');
     } catch (err: any) {

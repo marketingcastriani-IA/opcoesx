@@ -297,11 +297,33 @@ Resultado:
     }
 
     const result = await response.json();
+    
+    // Try tool_calls first, then fall back to parsing text content
+    let parsedTool: { legs?: RawLeg[]; total_rows_in_image?: number } | null = null;
+    
     const toolCallArgs = result.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
-    const parsedTool = toolCallArgs ? JSON.parse(toolCallArgs) : null;
+    if (toolCallArgs) {
+      try {
+        parsedTool = typeof toolCallArgs === "string" ? JSON.parse(toolCallArgs) : toolCallArgs;
+      } catch { console.warn("Failed to parse tool_calls arguments"); }
+    }
+    
+    // Fallback: extract JSON from text content if tool_calls didn't work
+    if (!parsedTool?.legs) {
+      const textContent = result.choices?.[0]?.message?.content;
+      if (typeof textContent === "string") {
+        const jsonMatch = textContent.match(/\{[\s\S]*"legs"\s*:\s*\[[\s\S]*\][\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            parsedTool = JSON.parse(jsonMatch[0]);
+            console.log("Extracted legs from text fallback");
+          } catch { console.warn("Failed to parse JSON from text content"); }
+        }
+      }
+    }
 
     console.log("OCR Extraction Summary:", JSON.stringify({
-      extracted: parsedTool?.legs?.length,
+      extracted: parsedTool?.legs?.length ?? 0,
       imageRows: parsedTool?.total_rows_in_image,
       legs: parsedTool?.legs,
     }));

@@ -90,7 +90,22 @@ export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsPro
           ? 'Strike da Put Comprada - Débito Líquido por ação'
           : 'Preço do ativo onde a operação não dá lucro nem prejuízo.';
 
+  // Extrai o preço do ativo da primeira perna stock (se houver)
+  const assetLeg = metrics.legs?.find(leg => leg.option_type === 'stock');
+  const assetPrice = assetLeg?.strike || 0;
+  const assetName = assetLeg?.asset || '';
+
   const items = [
+    ...(assetPrice > 0 ? [{
+      title: `PRECO DO ATIVO (${assetName})`,
+      value: `R$ ${assetPrice.toFixed(2)}`,
+      icon: DollarSign,
+      color: 'text-primary',
+      glowColor: 'shadow-[0_0_30px_-8px_hsl(var(--primary)/0.4)]',
+      tip: `Preco unitario da acao ${assetName} na montagem da estrutura.`,
+      badge: 'BASE',
+      badgeColor: 'bg-primary/25 text-primary border-primary/40',
+    }] : []),
     {
       title: costLabel,
       value: `R$ ${Math.abs(montageValue).toFixed(2)}`,

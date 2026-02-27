@@ -55,7 +55,7 @@ export default function LegsTable({ legs, onRemove, onUpdate }: LegsTableProps) 
                 key={i}
                 className={cn(
                   "border-b border-primary/10 transition-all hover:bg-primary/5",
-                  isStock && "bg-gradient-to-r from-primary/8 to-primary/3"
+                  isStock && "bg-gradient-to-r from-primary/[0.08] to-primary/[0.03]"
                 )}
               >
                 <TableCell>

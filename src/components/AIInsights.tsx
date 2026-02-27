@@ -122,7 +122,7 @@ export default function AIInsights({
   return (
     <div className="space-y-6">
       {/* IA Suggestion Card - Premium */}
-      <Card className="relative overflow-hidden border-2 border-primary/40 bg-gradient-to-br from-primary/8 via-card to-card shadow-[0_0_60px_-12px_hsl(var(--primary)/0.3)]">
+      <Card className="relative overflow-hidden border-2 border-primary/40 bg-gradient-to-br from-primary/[0.08] via-card to-card shadow-[0_0_60px_-12px_hsl(var(--primary)/0.3)]">
         <div className="absolute top-0 right-0 w-40 h-40 bg-primary/15 rounded-full blur-3xl -mr-20 -mt-20 animate-pulse" />
         <div className="absolute bottom-0 left-1/4 w-32 h-32 bg-primary/10 rounded-full blur-2xl -mb-16 animate-pulse" style={{ animationDelay: '1s' }} />
         

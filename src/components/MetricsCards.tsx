@@ -90,10 +90,9 @@ export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsPro
           ? 'Strike da Put Comprada - Débito Líquido por ação'
           : 'Preço do ativo onde a operação não dá lucro nem prejuízo.';
 
-  // Extrai o preço do ativo da primeira perna stock (se houver)
-  const assetLeg = metrics.legs?.find(leg => leg.option_type === 'stock');
-  const assetPrice = assetLeg?.strike || 0;
-  const assetName = assetLeg?.asset || '';
+  // Removed: legs is not part of AnalysisMetrics
+  const assetPrice = 0;
+  const assetName = '';
 
   const items = [
     ...(assetPrice > 0 ? [{
@@ -143,9 +142,7 @@ export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsPro
     {
       title: breakevenLabel,
       value: breakeven !== null
-        ? (Array.isArray(breakeven)
-          ? breakeven.map(b => `R$ ${b.toFixed(2)}`).join(' | ')
-          : `R$ ${breakeven[0].toFixed(2)}`)
+        ? breakeven.map(b => `R$ ${b.toFixed(2)}`).join(' | ')
         : (metrics.breakevens.length > 0
           ? metrics.breakevens.map(b => `R$ ${b.toFixed(2)}`).join(' | ')
           : 'N/A'),

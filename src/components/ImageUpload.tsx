@@ -126,10 +126,10 @@ export default function ImageUpload({ onLegsExtracted, onImageChange }: ImageUpl
     <Card
       className={cn(
         'relative border-2 transition-all duration-300 cursor-pointer group',
-        'bg-gradient-to-br from-primary/5 via-card to-card',
+        'bg-gradient-to-br from-info/5 via-card to-card',
         dragActive
-          ? 'border-primary/60 shadow-[0_0_40px_-8px_hsl(var(--primary)/0.4)]'
-          : 'border-dashed border-primary/30 hover:border-primary/50 hover:shadow-[0_0_40px_-12px_hsl(var(--primary)/0.35)]'
+          ? 'border-info/60 shadow-[0_0_40px_-8px_hsl(var(--info)/0.4)]'
+          : 'border-dashed border-info/30 hover:border-info/50 hover:shadow-[0_0_40px_-12px_hsl(var(--info)/0.35)]'
       )}
       onPaste={handlePaste}
       onDrop={handleDrop}
@@ -138,7 +138,7 @@ export default function ImageUpload({ onLegsExtracted, onImageChange }: ImageUpl
       onClick={() => !loading && fileInputRef.current?.click()}
       tabIndex={0}
     >
-      <CardContent className="flex flex-col items-center justify-center py-12 gap-4">
+      <CardContent className="flex flex-col items-center justify-center py-16 gap-5">
         <input
           ref={fileInputRef}
           type="file"
@@ -164,7 +164,7 @@ export default function ImageUpload({ onLegsExtracted, onImageChange }: ImageUpl
               <img 
                 src={preview} 
                 alt="Preview da imagem enviada" 
-                className="max-h-40 rounded-xl object-contain border border-primary/20 shadow-lg" 
+                className="max-h-72 w-full rounded-xl object-contain border border-info/20 shadow-lg" 
                 loading="lazy" 
               />
               <button
@@ -188,9 +188,9 @@ export default function ImageUpload({ onLegsExtracted, onImageChange }: ImageUpl
         ) : (
           <>
             <div className="relative">
-              <div className="absolute inset-0 rounded-2xl bg-primary/10 blur-2xl group-hover:bg-primary/15 transition-colors" />
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 relative">
-                <Zap className="h-8 w-8 text-primary" />
+              <div className="absolute inset-0 rounded-2xl bg-info/10 blur-2xl group-hover:bg-info/15 transition-colors" />
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-info/20 to-info/10 relative">
+                <Zap className="h-8 w-8 text-info" />
               </div>
             </div>
             <div className="text-center space-y-2">

@@ -35,23 +35,19 @@ const normalizeSide = (value?: string, optionType?: string) => {
 const normalizeOptionType = (value?: string, asset?: string) => {
   const raw = typeof value === "string" ? value.trim().toUpperCase() : "";
   
-  // Detecção direta
   if (raw === "CALL" || raw === "C") return "call";
   if (raw === "PUT" || raw === "P") return "put";
   if (raw === "STOCK" || raw === "AÇÃO" || raw === "ACAO" || raw === "ATIVO" || raw === "BASE" || raw === "-" || raw === "") {
     return "stock";
   }
   
-  // Se o campo está vazio ou é "-", tenta inferir pelo ticker
   if ((!raw || raw === "-") && asset) {
     const assetUpper = asset.toUpperCase();
-    // Tickers de opções têm 7+ caracteres e contêm letras de mês (A-L para calls, M-X para puts)
     if (assetUpper.length >= 7) {
       const monthLetter = assetUpper[4];
       if (/[A-L]/.test(monthLetter)) return "call";
       if (/[M-X]/.test(monthLetter)) return "put";
     }
-    // Se é apenas 4-5 caracteres, é ativo-objeto
     if (assetUpper.length <= 5) return "stock";
   }
   
@@ -61,7 +57,6 @@ const normalizeOptionType = (value?: string, asset?: string) => {
 const validateAsset = (asset?: string): string | null => {
   if (!asset) return null;
   const cleaned = asset.trim().toUpperCase();
-  // Ticker válido: 4-7 caracteres alfanuméricos
   if (/^[A-Z0-9]{4,7}$/.test(cleaned)) {
     return cleaned;
   }
@@ -73,28 +68,24 @@ const normalizeLegs = (legs: RawLeg[] | undefined) => {
 
   return legs
     .map((leg, idx) => {
-      // Validação de ativo primeiro
       const asset = validateAsset(leg.asset);
       if (!asset) {
         console.warn(`Leg ${idx}: Asset inválido ou vazio:`, leg.asset);
         return null;
       }
 
-      // Detecção de tipo de opção
       const optionType = normalizeOptionType(leg.option_type, asset);
       if (!optionType) {
         console.warn(`Leg ${idx}: Tipo de opção não reconhecido:`, leg.option_type);
         return null;
       }
 
-      // Detecção de lado
       const side = normalizeSide(leg.side, optionType);
       if (!side) {
         console.warn(`Leg ${idx}: Lado (Compra/Venda) não reconhecido:`, leg.side);
         return null;
       }
 
-      // Processamento de strike e price
       const strikeRaw = toNumber(leg.strike);
       const priceRaw = toNumber(leg.price);
 
@@ -102,30 +93,37 @@ const normalizeLegs = (legs: RawLeg[] | undefined) => {
       let price = priceRaw;
 
       if (optionType === "stock") {
-        // Para ativo-objeto: CRÍTICO - sempre extrair o preço
-        // Tenta primeiro o campo price, depois strike
-        let assetPrice = priceRaw > 0 ? priceRaw : strikeRaw;
-        
-        // Se ainda estiver zero, tenta extrair do asset (em caso de formato especial)
-        if (assetPrice <= 0 && leg.price) {
+        // TURBO: Lógica definitiva para ativo
+        // Tenta extrair preço em qualquer campo, com múltiplas tentativas
+        let assetPrice = 0;
+
+        // Tentativa 1: price > 0
+        if (priceRaw > 0) {
+          assetPrice = priceRaw;
+        }
+        // Tentativa 2: strike > 0
+        else if (strikeRaw > 0) {
+          assetPrice = strikeRaw;
+        }
+        // Tentativa 3: tenta extrair de strings adicionais
+        else if (leg.price && typeof leg.price === "string") {
           const extracted = toNumber(leg.price);
-          assetPrice = extracted > 0 ? extracted : assetPrice;
+          if (extracted > 0) assetPrice = extracted;
         }
-        
-        if (assetPrice <= 0 && leg.strike) {
+        // Tentativa 4: tenta extrair de strike como string
+        else if (leg.strike && typeof leg.strike === "string") {
           const extracted = toNumber(leg.strike);
-          assetPrice = extracted > 0 ? extracted : assetPrice;
+          if (extracted > 0) assetPrice = extracted;
         }
-        
+
         if (assetPrice <= 0) {
-          console.error(`Leg ${idx}: ERRO CRÍTICO - Preço do ativo não encontrado. Strike: ${strikeRaw}, Price: ${priceRaw}`);
+          console.error(`Leg ${idx}: ERRO CRÍTICO - Preço do ativo não encontrado após 4 tentativas. Strike: ${strikeRaw}, Price: ${priceRaw}`);
           return null;
         }
-        
+
         strike = assetPrice;
-        price = 0; // Sempre 0 para ativo-objeto
+        price = 0;
       } else {
-        // Para opções: strike é o preço de exercício, price é o prêmio
         if (strike <= 0) {
           console.warn(`Leg ${idx}: Strike inválido (${strikeRaw})`);
           return null;
@@ -136,7 +134,6 @@ const normalizeLegs = (legs: RawLeg[] | undefined) => {
         }
       }
 
-      // Validação de quantidade
       const rawQty = Math.max(1, Math.round(toNumber(leg.quantity) || 100));
       const quantity = Math.abs(rawQty);
 
@@ -188,68 +185,46 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `Você é especialista em leitura de screenshots de plataformas brasileiras de opções (Clear, XP, BTG, Rico, Inter, Nubank, Profit, etc).
+            content: `Você é especialista em leitura de screenshots de plataformas brasileiras de opções (Clear, XP, BTG, Profit, Rico, Inter, Nubank, etc).
 
-OBJETIVO: Extrair TODAS as pernas da grade de ordens/book de ofertas com 100% de precisão. NÃO invente pernas. NÃO omita pernas.
+OBJETIVO: Extrair TODAS as pernas com 100% de precisão. NÃO invente. NÃO omita.
 
-REGRAS CRÍTICAS DE EXTRAÇÃO:
+REGRAS CRÍTICAS:
 
-1. **SIDE (Compra/Venda)**:
-   - "buy" para Compra, C, Comprar
-   - "sell" para Venda, V, Vender
-   - Regra estrita: C = COMPRA (buy), V = VENDA (sell)
+1. **SIDE**: "buy" (Compra/C) ou "sell" (Venda/V)
 
-2. **OPTION_TYPE (Tipo de Instrumento)**:
-   - "call" para Call, C (quando no campo de tipo)
-   - "put" para Put, P (quando no campo de tipo)
-   - "stock" para Ativo-Objeto (quando o campo Call/Put mostra "-", está vazio, mostra "Ação", ou é o ticker base como PETR4, VALE3, etc)
-   - IMPORTANTE: Se uma linha tem um ticker base (ex: PETR4) sem indicação Call/Put, é um ativo-objeto (stock)
+2. **OPTION_TYPE**: 
+   - "call" para Call
+   - "put" para Put
+   - "stock" para Ativo-Objeto (PETR4, VALE3, etc - sem Call/Put)
 
-3. **ASSET (Ticker)**:
-   - Sempre em MAIÚSCULAS
-   - Exemplos válidos: PETR4, VALE3, PETRC405, PETRE30, PETRD325
-   - Para opções: ticker base + letra de mês (A-L para calls, M-X para puts) + strike
-   - Para ativos: ticker base apenas (4-5 caracteres)
+3. **ASSET**: Ticker em MAIÚSCULAS (PETR4, PETRC405, etc)
 
-4. **STRIKE (Preço de Exercício)**:
-   - Para opções: preço de exercício como número decimal (ex: 39.65, 30.00)
-   - Para ativos (stock): use o preço unitário de compra/venda do ativo (ex: 39.61)
-   - CRÍTICO PARA ATIVOS: NÃO deixe em branco ou zero! Sempre extraia o preço.
+4. **STRIKE**: 
+   - Para opções: preço de exercício (39.65, 30.00)
+   - Para ativos (stock): SEMPRE o preço unitário (39.61, 25.50, etc)
+   - CRÍTICO: Nunca deixe em branco ou zero para ativos!
 
-5. **PRICE (Prêmio/Preço)**:
-   - Para opções: prêmio como número decimal (ex: 0.80, 1.50)
-   - Para ativos (stock): use 0 (zero)
-   - CRÍTICO: Se o preço do ativo está em qualquer campo, coloque-o em STRIKE e deixe PRICE em 0
+5. **PRICE**:
+   - Para opções: prêmio (0.80, 1.50)
+   - Para ativos: SEMPRE 0 (zero)
 
-6. **QUANTITY (Quantidade)**:
-   - Número inteiro >= 1
-   - Nunca envie quantidade negativa
-   - Padrão: 100 se não especificado
+6. **QUANTITY**: Número inteiro >= 1 (padrão 100)
 
-DUPLA VERIFICAÇÃO OBRIGATÓRIA:
-- Conte quantas linhas a tabela da imagem possui
-- O número de pernas extraídas DEVE ser igual ao número de linhas
-- Se faltar alguma perna, revise e inclua
-
-EXEMPLO DE ESTRUTURA CORRETA (Compra Coberta):
+EXEMPLO CORRETO (Compra Coberta):
 Linha 1: side=sell, option_type=call, asset=PETRC405, strike=39.65, price=0.80, quantity=100
 Linha 2: side=buy, option_type=stock, asset=PETR4, strike=39.61, price=0, quantity=100
-(CRÍTICO: O preço do ativo (39.61) SEMPRE vai em STRIKE, PRICE é sempre 0)
-
-EXEMPLO DE ESTRUTURA CORRETA (Trava de Alta):
-Linha 1: side=buy, option_type=call, asset=PETRD30, strike=30.00, price=1.50, quantity=100
-Linha 2: side=sell, option_type=call, asset=PETRD32, strike=32.00, price=0.50, quantity=100
 
 CHECKLIST FINAL:
-✓ Cada linha da tabela virou uma perna?
-✓ Ativos (stock) têm preço em STRIKE e 0 em PRICE?
-✓ Opções têm strike e prêmio corretos?
-✓ Nenhum preço ficou em branco ou zero para ativos?`,
+✓ Cada linha da tabela = uma perna?
+✓ Ativos têm preço em STRIKE, 0 em PRICE?
+✓ Nenhum preço ficou zero para ativos?
+✓ Número de pernas = número de linhas?`,
           },
           {
             role: "user",
             content: [
-              { type: "text", text: "Extraia TODAS as pernas da operação desta imagem com máxima precisão. CRÍTICO: Para ativos (stock), certifique-se de que o preço está em STRIKE (não em PRICE). Cada linha da tabela é uma perna. Não omita nenhuma. Valide que o número total de pernas extraídas corresponde ao número de linhas visíveis na tabela." },
+              { type: "text", text: "Extraia TODAS as pernas com máxima precisão. CRÍTICO PARA ATIVOS: O preço SEMPRE vai em STRIKE (nunca em PRICE). Valide que o número de pernas extraídas = número de linhas na tabela." },
               { type: "image_url", image_url: { url: resolvedImage } },
             ],
           },
@@ -259,7 +234,7 @@ CHECKLIST FINAL:
             type: "function",
             function: {
               name: "extract_legs",
-              description: "Extrai todas as pernas de opções/ações da imagem com validação de precisão",
+              description: "Extrai todas as pernas com validação de precisão",
               parameters: {
                 type: "object",
                 properties: {
@@ -268,28 +243,19 @@ CHECKLIST FINAL:
                     items: {
                       type: "object",
                       properties: {
-                        side: { type: "string", enum: ["buy", "sell"], description: "Compra (buy) ou Venda (sell)" },
-                        option_type: { type: "string", enum: ["call", "put", "stock"], description: "Tipo: call, put ou ativo-objeto (stock)" },
-                        asset: { type: "string", description: "Ticker em maiúsculas (ex: PETR4, PETRC405)" },
-                        strike: { type: "number", description: "Preço de exercício (ou preço do ativo para stock)" },
-                        price: { type: "number", description: "Prêmio da opção (ou 0 para stock)" },
-                        quantity: { type: "number", description: "Quantidade (inteiro >= 1)" },
+                        side: { type: "string", enum: ["buy", "sell"] },
+                        option_type: { type: "string", enum: ["call", "put", "stock"] },
+                        asset: { type: "string" },
+                        strike: { type: "number" },
+                        price: { type: "number" },
+                        quantity: { type: "number" },
                       },
                       required: ["side", "option_type", "asset", "strike", "price", "quantity"],
-                      additionalProperties: false,
                     },
                   },
-                  total_rows_in_image: {
-                    type: "number",
-                    description: "Número total de linhas/pernas visíveis na tabela da imagem para validação",
-                  },
-                  validation_notes: {
-                    type: "string",
-                    description: "Notas sobre a extração (ex: 'Detectadas 2 pernas: 1 call vendida + 1 ativo comprado')",
-                  },
+                  total_rows_in_image: { type: "number" },
                 },
                 required: ["legs", "total_rows_in_image"],
-                additionalProperties: false,
               },
             },
           },
@@ -321,16 +287,12 @@ CHECKLIST FINAL:
     console.log("OCR Extraction Summary:", {
       extracted: parsedTool?.legs?.length,
       imageRows: parsedTool?.total_rows_in_image,
-      notes: parsedTool?.validation_notes,
     });
 
     const normalized = normalizeLegs(parsedTool?.legs);
 
-    // Validação: se o número de pernas extraídas não corresponde ao número de linhas, log de aviso
     if (normalized.length !== parsedTool?.total_rows_in_image) {
-      console.warn(
-        `Mismatch: Extracted ${normalized.length} legs but image has ${parsedTool?.total_rows_in_image} rows. Review may be needed.`
-      );
+      console.warn(`Mismatch: Extracted ${normalized.length} legs but image has ${parsedTool?.total_rows_in_image} rows.`);
     }
 
     return new Response(JSON.stringify({ legs: normalized }), {

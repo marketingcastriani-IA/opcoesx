@@ -110,10 +110,10 @@ export default function CDIComparison({ metrics, cdiRate, setCdiRate, daysToExpi
       : 'N/A');
 
   return (
-    <Card>
+    <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/8 to-card shadow-[0_0_40px_-12px_hsl(var(--primary)/0.2)]">
       <CardHeader>
-        <CardTitle className="text-base flex items-center gap-2">
-          Comparativo: Estratégia vs CDI
+        <CardTitle className="text-2xl font-black tracking-tight flex items-center gap-3">
+          📊 COMPARATIVO: ESTRATÉGIA vs CDI
           {comparison?.efficiency != null && (
             <Badge
               variant={comparison.efficiency >= 100 ? 'default' : 'destructive'}
@@ -155,7 +155,7 @@ export default function CDIComparison({ metrics, cdiRate, setCdiRate, daysToExpi
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {[0, 1, 2].map(offset => {
+                {[0, 1, 2, 3, 4].map(offset => {
                   const y = new Date().getFullYear() + offset;
                   return <SelectItem key={y} value={String(y)}>{y}</SelectItem>;
                 })}

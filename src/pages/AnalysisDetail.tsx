@@ -434,12 +434,10 @@ export default function AnalysisDetail() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base">Pernas da Estratégia — Preços Atuais</CardTitle>
-            {analysis.status === 'active' && (
-              <Button size="sm" onClick={() => setShowAddLegForm(!showAddLegForm)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Nova Perna
-              </Button>
-            )}
+            <Button size="sm" onClick={() => setShowAddLegForm(!showAddLegForm)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nova Perna
+            </Button>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Add Leg Form */}

@@ -208,23 +208,23 @@ export default function Dashboard() {
 
             <button
               onClick={() => setInputMode('manual')}
-              className="group relative overflow-hidden rounded-2xl border-2 border-dashed border-border/60 bg-gradient-to-br from-muted/30 via-card to-card p-8 text-left transition-all duration-300 hover:border-primary/40 hover:shadow-[0_0_50px_-12px_hsl(var(--primary)/0.2)] hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="group relative overflow-hidden rounded-2xl border-2 border-dashed border-accent/40 bg-gradient-to-br from-accent/8 via-card to-card p-8 text-left transition-all duration-300 hover:border-accent/60 hover:shadow-[0_0_50px_-12px_hsl(var(--accent)/0.3)] hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
-              <div className="absolute top-0 right-0 w-32 h-32 bg-muted/30 rounded-full blur-3xl -translate-y-8 translate-x-8 group-hover:bg-primary/5 transition-colors" />
+              <div className="absolute top-0 right-0 w-32 h-32 bg-accent/10 rounded-full blur-3xl -translate-y-8 translate-x-8 group-hover:bg-accent/15 transition-colors" />
               <div className="relative space-y-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/60 text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent/20 text-accent group-hover:bg-accent/30 transition-colors">
                     <Keyboard className="h-7 w-7" />
                   </div>
                   <div>
-                    <Badge variant="outline" className="text-[9px] border-border/60 text-muted-foreground mb-1">PRECISO</Badge>
+                    <Badge variant="outline" className="text-[9px] border-accent/40 text-accent mb-1">PRECISO</Badge>
                     <h3 className="text-xl font-bold">Entrada Manual</h3>
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground leading-relaxed">
                   Insira manualmente cada perna: <strong className="text-foreground">ativo, strike, prêmio, quantidade</strong>. Controle total.
                 </p>
-                <div className="flex items-center gap-2 text-muted-foreground group-hover:text-primary text-sm font-medium transition-colors">
+                <div className="flex items-center gap-2 text-accent group-hover:text-accent text-sm font-medium transition-colors">
                   Inserir manualmente <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                 </div>
               </div>

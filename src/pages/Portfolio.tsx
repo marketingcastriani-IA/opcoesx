@@ -23,18 +23,7 @@ interface ClosedOperation {
 
 export default function Portfolio() {
   const { user, loading: authLoading } = useAuth();
-  const [operations, setOperations] = useState<ClosedOperation[]>([
-    {
-      id: '1',
-      name: 'Compra Coberta PETR4',
-      asset: 'PETR4',
-      entryDate: '2024-01-15',
-      exitDate: '2024-02-15',
-      profitLoss: 850.00,
-      percentage: 2.2,
-      strategy: 'Covered Call',
-    },
-  ]);
+  const [operations, setOperations] = useState<ClosedOperation[]>([]);
 
   const [showForm, setShowForm] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);

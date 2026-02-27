@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Plus, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface LegFormProps {
@@ -23,7 +23,6 @@ export default function LegForm({ onAdd }: LegFormProps) {
 
   const isStock = leg.option_type === 'stock';
   const hasAssetPrice = isStock && leg.price > 0;
-  const missingAssetPrice = isStock && leg.price <= 0;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,13 +30,8 @@ export default function LegForm({ onAdd }: LegFormProps) {
     if (leg.quantity <= 0) return;
     if (leg.price < 0) return;
     
-    // Validação crítica para ativos
-    if (leg.option_type === 'stock') {
-      if (leg.strike <= 0 && leg.price <= 0) {
-        alert('Para ativos, o preço é obrigatório!');
-        return;
-      }
-    } else {
+    // Validação para opções: strike é obrigatório
+    if (leg.option_type !== 'stock') {
       if (leg.strike <= 0) return;
     }
 
@@ -133,15 +127,11 @@ export default function LegForm({ onAdd }: LegFormProps) {
               className={cn(
                 "h-10 font-bold text-base",
                 isStock && "bg-gradient-to-r from-primary/20 to-primary/10 border-primary/40 text-primary font-black",
-                hasAssetPrice && "ring-2 ring-success/40",
-                missingAssetPrice && "ring-2 ring-destructive/40"
+                hasAssetPrice && "ring-2 ring-success/40"
               )}
             />
             {isStock && hasAssetPrice && (
               <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-success" />
-            )}
-            {isStock && missingAssetPrice && (
-              <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-destructive" />
             )}
           </div>
         </div>
@@ -168,17 +158,17 @@ export default function LegForm({ onAdd }: LegFormProps) {
         </div>
       </div>
 
-      {/* Indicador de Status para Ativos */}
+      {/* Indicador de Status para Ativos - Apenas informativo, sem bloquear */}
       {isStock && (
         <div className={cn(
           "px-4 py-2 rounded-lg text-sm font-semibold text-center transition-all",
           hasAssetPrice
             ? "bg-success/15 text-success border border-success/30"
-            : "bg-warning/15 text-warning border border-warning/30"
+            : "bg-muted/50 text-muted-foreground border border-muted/30"
         )}>
           {hasAssetPrice 
-            ? `✓ Preço do ativo confirmado: R$ ${leg.price.toFixed(2)}`
-            : '⚠ Insira o preço do ativo para continuar'
+            ? `✓ Preço do ativo: R$ ${leg.price.toFixed(2)}`
+            : 'Insira o preço do ativo (opcional para adicionar)'
           }
         </div>
       )}

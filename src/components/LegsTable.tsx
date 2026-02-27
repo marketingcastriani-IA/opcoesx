@@ -127,8 +127,8 @@ export default function LegsTable({ legs, onRemove, onUpdate }: LegsTableProps) 
                       )}
                       disabled={isStock}
                     />
-                    {isStock && !hasPrice && (
-                      <AlertCircle className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 text-destructive" />
+                    {isStock && hasPrice && (
+                      <CheckCircle2 className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 text-success" />
                     )}
                   </div>
                 </TableCell>

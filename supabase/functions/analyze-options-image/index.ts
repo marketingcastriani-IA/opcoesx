@@ -113,24 +113,21 @@ const normalizeLegs = (legs: RawLeg[] | undefined) => {
           }
         }
 
-        if (assetPrice <= 0) {
-          console.error(`Leg ${idx}: ERRO - Preço do ativo não encontrado. Strike: ${strikeRaw}, Price: ${priceRaw}`);
-          return null;
-        }
-
-        if (assetPrice < 0.01 || assetPrice > 10000) {
+        // Se o preço não foi encontrado, permitir 0 (será preenchido depois pelo usuário)
+        if (assetPrice > 0 && (assetPrice < 0.01 || assetPrice > 10000)) {
           console.error(`Leg ${idx}: Preço de ativo fora do intervalo: ${assetPrice}`);
           return null;
         }
 
-        strike = assetPrice;
+        console.log(`Leg ${idx}: Ativo ${asset} com preço ${assetPrice || 'não encontrado - será preenchido depois'}`);
+        strike = assetPrice > 0 ? assetPrice : 0;
         price = 0;
       } else {
         if (strike <= 0) {
           console.warn(`Leg ${idx}: Strike inválido (${strikeRaw})`);
           return null;
         }
-        if (price <= 0) {
+        if (price < 0) {
           console.warn(`Leg ${idx}: Prêmio inválido (${priceRaw})`);
           return null;
         }

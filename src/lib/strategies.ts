@@ -1,4 +1,3 @@
-// Strategy auto-detection module (Collar, Covered Call, etc.)
 
 import { Leg } from './types';
 import { getUnderlyingRoot, getMonthFromLetter } from './b3-calendar';
@@ -120,6 +119,96 @@ export function detectStrategy(legs: Leg[]): StrategyInfo | null {
       maxLoss: Math.round(maxLoss * 100) / 100,
       isRiskFree: false,
     };
+  }
+
+  // ─── Straddle: Compra Call + Compra Put no mesmo Strike ───────────────────────
+  const straddleCall = sortedLegs.find(l => l.option_type === 'call' && l.side === 'buy');
+  const straddlePut = sortedLegs.find(l => l.option_type === 'put' && l.side === 'buy');
+  
+  if (straddleCall && straddlePut && sortedLegs.length === 2 && 
+      Math.abs(straddleCall.strike - straddlePut.strike) < 0.01 &&
+      straddleCall.quantity === straddlePut.quantity) {
+    const qty = straddleCall.quantity;
+    const strike = straddleCall.strike;
+    const montageTotal = (straddleCall.price + straddlePut.price) * qty;
+    const breakevens = [
+      Math.round((strike - (montageTotal / qty)) * 100) / 100,
+      Math.round((strike + (montageTotal / qty)) * 100) / 100
+    ];
+    const maxLoss = montageTotal;
+
+    return {
+      type: 'Straddle',
+      label: 'Straddle (Volatilidade Alta)',
+      montageTotal: Math.round(montageTotal * 100) / 100,
+      breakeven: breakevens,
+      maxProfit: 'Ilimitado',
+      maxLoss: Math.round(maxLoss * 100) / 100,
+      isRiskFree: false,
+    };
+  }
+
+  // ─── Strangle: Compra Call (K2) + Compra Put (K1) com K1 < K2 ─────────────────
+  const strangleCall = sortedLegs.find(l => l.option_type === 'call' && l.side === 'buy');
+  const stranglePut = sortedLegs.find(l => l.option_type === 'put' && l.side === 'buy');
+  
+  if (strangleCall && stranglePut && sortedLegs.length === 2 && 
+      stranglePut.strike < strangleCall.strike &&
+      strangleCall.quantity === stranglePut.quantity) {
+    const qty = strangleCall.quantity;
+    const montageTotal = (strangleCall.price + stranglePut.price) * qty;
+    const breakevens = [
+      Math.round((stranglePut.strike - (montageTotal / qty)) * 100) / 100,
+      Math.round((strangleCall.strike + (montageTotal / qty)) * 100) / 100
+    ];
+    const maxLoss = montageTotal;
+
+    return {
+      type: 'Strangle',
+      label: 'Strangle (Volatilidade)',
+      montageTotal: Math.round(montageTotal * 100) / 100,
+      breakeven: breakevens,
+      maxProfit: 'Ilimitado',
+      maxLoss: Math.round(maxLoss * 100) / 100,
+      isRiskFree: false,
+    };
+  }
+
+  // ─── Iron Condor: Venda Call K2 + Compra Call K3 + Venda Put K1 + Compra Put K0 ────
+  const ironCondorLegs = sortedLegs.filter(l => ['call', 'put'].includes(l.option_type));
+  const callLegs = ironCondorLegs.filter(l => l.option_type === 'call').sort((a, b) => a.strike - b.strike);
+  const putLegs = ironCondorLegs.filter(l => l.option_type === 'put').sort((a, b) => a.strike - b.strike);
+
+  if (callLegs.length === 2 && putLegs.length === 2 && sortedLegs.length === 4) {
+    const sellCall = callLegs[0];
+    const buyCall = callLegs[1];
+    const sellPut = putLegs[1];
+    const buyPut = putLegs[0];
+
+    if (sellCall.side === 'sell' && buyCall.side === 'buy' &&
+        sellPut.side === 'sell' && buyPut.side === 'buy' &&
+        sellCall.quantity === buyCall.quantity && buyPut.quantity === sellPut.quantity) {
+      const qty = sellCall.quantity;
+      const montageTotal = (sellCall.price + sellPut.price - buyCall.price - buyPut.price) * qty;
+      const maxProfit = montageTotal;
+      const maxLoss = Math.min(
+        (sellCall.strike - buyCall.strike) * qty - montageTotal,
+        (sellPut.strike - buyPut.strike) * qty - montageTotal
+      );
+
+      return {
+        type: 'IronCondor',
+        label: 'Iron Condor (Renda Neutra)',
+        montageTotal: Math.round(montageTotal * 100) / 100,
+        breakeven: [
+          Math.round((sellPut.strike + (montageTotal / qty)) * 100) / 100,
+          Math.round((sellCall.strike - (montageTotal / qty)) * 100) / 100
+        ],
+        maxProfit: Math.round(maxProfit * 100) / 100,
+        maxLoss: Math.round(Math.abs(maxLoss) * 100) / 100,
+        isRiskFree: false,
+      };
+    }
   }
 
   return null;

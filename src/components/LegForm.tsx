@@ -130,7 +130,7 @@ export default function LegForm({ onAdd }: LegFormProps) {
               })}
               placeholder={isStock ? '39.61' : '1.50'}
               className={cn(
-                "h-10 font-bold text-base",
+                "h-10 font-bold text-base cursor-text",
                 isStock && "bg-gradient-to-r from-primary/20 to-primary/10 border-primary/40 text-primary font-black",
                 hasAssetPrice && "ring-2 ring-success/40",
                 missingAssetPrice && "ring-2 ring-destructive/40"

@@ -16,8 +16,9 @@ export default function ImageUpload({ onLegsExtracted, onImageChange }: ImageUpl
   const [preview, setPreview] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const processingRef = useRef(false);
 
-  const processImage = useCallback(async (imageDataUrl: string) => {
+  const processImage = useCallback(async (imageDataUrl: string): Promise<void> => {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('analyze-options-image', {
@@ -45,6 +46,8 @@ export default function ImageUpload({ onLegsExtracted, onImageChange }: ImageUpl
   }, [onLegsExtracted]);
 
   const handleFile = useCallback((file: File) => {
+    if (processingRef.current) return; // Prevent double processing
+    
     if (!file.type.startsWith('image/')) {
       toast.error('Formato inválido', { description: 'Por favor, envie uma imagem.' });
       return;
@@ -55,6 +58,8 @@ export default function ImageUpload({ onLegsExtracted, onImageChange }: ImageUpl
       return;
     }
 
+    processingRef.current = true;
+
     // Notificar que a imagem está sendo trocada (para limpar pernas antigas)
     onImageChange?.();
 
@@ -62,11 +67,12 @@ export default function ImageUpload({ onLegsExtracted, onImageChange }: ImageUpl
     reader.onload = (e) => {
       const result = e.target?.result as string;
       if (!result?.startsWith('data:image/')) {
+        processingRef.current = false;
         toast.error('Formato inválido', { description: 'Não foi possível ler a imagem.' });
         return;
       }
       setPreview(result);
-      processImage(result);
+      processImage(result).finally(() => { processingRef.current = false; });
     };
     reader.readAsDataURL(file);
   }, [processImage, onImageChange]);

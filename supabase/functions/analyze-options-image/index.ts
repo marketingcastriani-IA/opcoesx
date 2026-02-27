@@ -298,10 +298,20 @@ Resultado:
 
     const result = await response.json();
     
+    // Debug: log what the AI gateway returned
+    const msg = result.choices?.[0]?.message;
+    console.log("AI Response debug:", JSON.stringify({
+      hasToolCalls: !!msg?.tool_calls,
+      toolCallsCount: msg?.tool_calls?.length,
+      contentType: typeof msg?.content,
+      contentPreview: typeof msg?.content === "string" ? msg.content.substring(0, 500) : Array.isArray(msg?.content) ? "array" : typeof msg?.content,
+      finishReason: result.choices?.[0]?.finish_reason,
+    }));
+    
     // Try tool_calls first, then fall back to parsing text content
     let parsedTool: { legs?: RawLeg[]; total_rows_in_image?: number } | null = null;
     
-    const toolCallArgs = result.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
+    const toolCallArgs = msg?.tool_calls?.[0]?.function?.arguments;
     if (toolCallArgs) {
       try {
         parsedTool = typeof toolCallArgs === "string" ? JSON.parse(toolCallArgs) : toolCallArgs;
@@ -310,8 +320,18 @@ Resultado:
     
     // Fallback: extract JSON from text content if tool_calls didn't work
     if (!parsedTool?.legs) {
-      const textContent = result.choices?.[0]?.message?.content;
-      if (typeof textContent === "string") {
+      let textContent = "";
+      if (typeof msg?.content === "string") {
+        textContent = msg.content;
+      } else if (Array.isArray(msg?.content)) {
+        textContent = msg.content
+          .filter((p: any) => p.type === "text")
+          .map((p: any) => p.text)
+          .join("\n");
+      }
+      
+      if (textContent) {
+        console.log("Fallback text (first 500):", textContent.substring(0, 500));
         const jsonMatch = textContent.match(/\{[\s\S]*"legs"\s*:\s*\[[\s\S]*\][\s\S]*\}/);
         if (jsonMatch) {
           try {

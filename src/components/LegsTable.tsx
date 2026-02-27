@@ -103,7 +103,7 @@ export default function LegsTable({ legs, onRemove, onUpdate }: LegsTableProps) 
                       onChange={(e) => {
                         const val = parseFloat(e.target.value) || 0;
                         if (isStock) {
-                          onUpdate(i, { ...leg, strike: val, price: 0 });
+                          onUpdate(i, { ...leg, strike: val });
                         } else {
                           updateField(i, 'strike', val);
                         }
@@ -128,10 +128,10 @@ export default function LegsTable({ legs, onRemove, onUpdate }: LegsTableProps) 
                       onChange={(e) => updateField(i, 'price', parseFloat(e.target.value) || 0)}
                       className={cn(
                         "h-9 text-right font-bold text-base pr-8",
-                        isStock && "border-muted/40 bg-muted/20 text-muted-foreground",
+                        isStock && "border-primary/40 bg-gradient-to-r from-primary/20 to-primary/10 text-primary font-black",
                         !isStock && "font-mono"
                       )}
-                      disabled={isStock}
+                      
                     />
                     {isStock && hasPrice && (
                       <CheckCircle2 className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 text-success" />

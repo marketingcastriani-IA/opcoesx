@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,8 +18,6 @@ interface ClosedOperation {
   strategy: string;
 }
 
-const STORAGE_KEY = 'portfolio_operations';
-
 export default function Portfolio() {
   const [operations, setOperations] = useState<ClosedOperation[]>([
     // Exemplo para demonstração
@@ -34,25 +32,6 @@ export default function Portfolio() {
       strategy: 'Covered Call',
     },
   ]);
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        setOperations(JSON.parse(stored));
-      }
-    } catch (error) {
-      console.error('Erro ao carregar operações salvas', error);
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(operations));
-    } catch (error) {
-      console.error('Erro ao salvar operações', error);
-    }
-  }, [operations]);
 
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({

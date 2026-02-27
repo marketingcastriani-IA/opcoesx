@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import Header from '@/components/Header';
@@ -21,6 +21,8 @@ interface ClosedOperation {
   strategy: string;
 }
 
+const STORAGE_KEY = 'portfolio_operations';
+
 export default function Portfolio() {
   const { user, loading: authLoading } = useAuth();
   const [operations, setOperations] = useState<ClosedOperation[]>([
@@ -35,6 +37,25 @@ export default function Portfolio() {
       strategy: 'Covered Call',
     },
   ]);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        setOperations(JSON.parse(stored));
+      }
+    } catch (error) {
+      console.error('Erro ao carregar operações salvas', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(operations));
+    } catch (error) {
+      console.error('Erro ao salvar operações', error);
+    }
+  }, [operations]);
 
   const [showForm, setShowForm] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);

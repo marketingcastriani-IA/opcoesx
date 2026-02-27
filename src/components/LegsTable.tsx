@@ -22,6 +22,15 @@ export default function LegsTable({ legs, onRemove, onUpdate }: LegsTableProps) 
     onUpdate(index, updated);
   };
 
+  const updateOptionType = (index: number, value: 'call' | 'put' | 'stock') => {
+    const current = legs[index];
+    onUpdate(index, {
+      ...current,
+      option_type: value,
+      strike: value === 'stock' ? 0 : current.strike,
+    });
+  };
+
   return (
     <div className="rounded-lg border overflow-x-auto">
       <Table>
@@ -52,7 +61,7 @@ export default function LegsTable({ legs, onRemove, onUpdate }: LegsTableProps) 
               <TableCell>
                 <select
                   value={leg.option_type}
-                  onChange={(e) => updateField(i, 'option_type', e.target.value as 'call' | 'put' | 'stock')}
+                  onChange={(e) => updateOptionType(i, e.target.value as 'call' | 'put' | 'stock')}
                   className="h-8 rounded-md border border-input bg-background px-2 text-xs"
                 >
                   <option value="call">Call</option>
@@ -71,9 +80,10 @@ export default function LegsTable({ legs, onRemove, onUpdate }: LegsTableProps) 
                 <Input
                   type="number"
                   step="0.01"
-                  value={leg.strike}
+                  value={leg.option_type === 'stock' ? '' : leg.strike}
                   onChange={(e) => updateField(i, 'strike', parseFloat(e.target.value) || 0)}
                   className="h-8 text-right font-mono"
+                  placeholder={leg.option_type === 'stock' ? 'N/A' : '0.00'}
                   disabled={leg.option_type === 'stock'}
                 />
               </TableCell>

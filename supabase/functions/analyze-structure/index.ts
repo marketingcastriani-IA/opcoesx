@@ -15,7 +15,14 @@ serve(async (req) => {
 
     const legsDescription = Array.isArray(legs)
       ? legs
-          .map((l: any) => `${l.side === "buy" ? "Compra" : "Venda"} ${String(l.option_type).toUpperCase()} ${l.asset} Strike ${l.strike} @ ${l.price} x${l.quantity}`)
+          .map((l: any) => {
+            const side = l.side === "buy" ? "Compra" : "Venda";
+            const type = String(l.option_type).toUpperCase();
+            if (l.option_type === "stock") {
+              return `${side} ATIVO ${l.asset} @ ${l.price} x${l.quantity}`;
+            }
+            return `${side} ${type} ${l.asset} Strike ${l.strike} @ ${l.price} x${l.quantity}`;
+          })
           .join("\n")
       : "Sem pernas";
 

@@ -246,10 +246,18 @@ export default function Dashboard() {
                 <CardContent><LegForm onAdd={addLeg} /></CardContent>
               </Card>
             ) : (
-              <ImageUpload 
-                onLegsExtracted={handleLegsFromImage}
-                onImageChange={() => setLegs([])}
-              />
+              <div className="space-y-4">
+                <ImageUpload 
+                  onLegsExtracted={handleLegsFromImage}
+                  onImageChange={() => setLegs([])}
+                />
+                {legs.length > 0 && (
+                  <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
+                    <CardHeader><CardTitle className="text-base">Adicionar Perna Manual</CardTitle></CardHeader>
+                    <CardContent><LegForm onAdd={addLeg} /></CardContent>
+                  </Card>
+                )}
+              </div>
             )}
           </div>
         )}

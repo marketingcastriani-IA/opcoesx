@@ -93,7 +93,7 @@ const normalizeLegs = (legs: RawLeg[] | undefined) => {
       let price = priceRaw;
 
       if (optionType === "stock") {
-        // VALIDAÇÃO TRIPLA: Preço de Ativo
+        // VALIDAÇÃO QUÍNTUPLA: Preço de Ativo com máxima prioridade
         let assetPrice = 0;
 
         // Tentativa 1: price > 0 (campo de preço do prêmio)
@@ -204,33 +204,41 @@ serve(async (req) => {
             role: "system",
             content: `Você é especialista em leitura de screenshots de plataformas brasileiras de opções (Clear, XP, BTG, Profit, Rico, Inter, Nubank, etc).
 
-OBJETIVO CRÍTICO: Extrair TODAS as pernas com 100% de precisão. O preço do ativo é CRÍTICO - nunca deixe em branco ou zero.
+OBJETIVO CRÍTICO: Extrair TODAS as pernas com 100% de precisão. O preço do ativo é ABSOLUTAMENTE CRÍTICO - nunca deixe em branco ou zero. Procure em TODOS os campos da linha.
 
 REGRAS ABSOLUTAS:
 
-1. **SIDE**: "buy" (Compra/C) ou "sell" (Venda/V)
+1. SIDE: "buy" (Compra/C) ou "sell" (Venda/V)
 
-2. **OPTION_TYPE**: 
+2. OPTION_TYPE: 
    - "call" para Call
    - "put" para Put
    - "stock" para Ativo-Objeto (PETR4, VALE3, etc - sem Call/Put)
 
-3. **ASSET**: Ticker em MAIÚSCULAS (PETR4, PETRC405, etc)
+3. ASSET: Ticker em MAIÚSCULAS (PETR4, PETRC405, etc)
    - Ativo-objeto: 4-5 caracteres (PETR4, VALE3, BBAS3)
    - Opção: 7 caracteres (PETRC405, VALEJ405)
 
-4. **STRIKE**: 
+4. STRIKE: 
    - Para opções: preço de exercício (39.65, 30.00)
    - Para ativos (stock): SEMPRE o preço unitário (39.61, 25.50, etc)
    - CRÍTICO: Nunca deixe em branco ou zero para ativos!
    - Se o preço estiver em "Preço", coloque em STRIKE
    - Se o preço estiver em "Strike", coloque em STRIKE
+   - Se o preço estiver em qualquer outro campo, AINDA ASSIM coloque em STRIKE
+   - Procure em TODAS as colunas da linha do ativo
 
-5. **PRICE**:
+5. PRICE:
    - Para opções: prêmio (0.80, 1.50)
-   - Para ativos: SEMPRE 0 (zero)
+   - Para ativos: SEMPRE 0 (zero) - NÃO coloque o preço do ativo aqui
 
-6. **QUANTITY**: Número inteiro >= 1 (padrão 100)
+6. QUANTITY: Número inteiro >= 1 (padrão 100)
+
+7. REGRA DE OURO PARA ATIVOS:
+   - Se a linha tem um ticker de 4-5 caracteres (PETR4, VALE3, BBAS3), é um ATIVO
+   - Ativos SEMPRE têm um preço unitário visível na linha
+   - Procure esse preço em: coluna "Preço", coluna "Strike", coluna "Bid", coluna "Ask", ou qualquer valor numérico > 0 na linha
+   - Se encontrar múltiplos valores, escolha o que faz sentido (ex: 39.61 para PETR4)
 
 EXEMPLO CORRETO (Compra Coberta):
 Linha 1: side=sell, option_type=call, asset=PETRC405, strike=39.65, price=0.80, quantity=100
@@ -246,7 +254,7 @@ CHECKLIST FINAL:
           {
             role: "user",
             content: [
-              { type: "text", text: "CRÍTICO: Extraia TODAS as pernas com máxima precisão. ESPECIAL ATENÇÃO AO PREÇO DO ATIVO - ele NUNCA pode ser zero. Se vir um ativo (como PETR4, VALE3, etc), o preço DEVE estar em STRIKE. Valide que o número de pernas extraídas = número de linhas na tabela. Se houver dúvida sobre o preço do ativo, procure em TODOS os campos da linha." },
+              { type: "text", text: "INSTRUÇÕES CRÍTICAS:\n1. Extraia TODAS as pernas com máxima precisão\n2. ESPECIAL ATENÇÃO AO PREÇO DO ATIVO - ele NUNCA pode ser zero\n3. Se vir um ativo (como PETR4, VALE3, BBAS3, etc), o preço DEVE estar em STRIKE\n4. Procure o preço do ativo em TODOS os campos da linha (Preço, Strike, Bid, Ask, etc)\n5. Valide que o número de pernas extraídas = número de linhas na tabela\n6. Se houver dúvida, escolha o valor numérico que faz sentido para o ativo\n7. NUNCA deixe preço de ativo em branco ou zero" },
               { type: "image_url", image_url: { url: resolvedImage } },
             ],
           },

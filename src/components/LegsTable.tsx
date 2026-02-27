@@ -102,11 +102,10 @@ export default function LegsTable({ legs, onRemove, onUpdate }: LegsTableProps) 
                       value={leg.option_type === 'stock' ? leg.price : leg.strike}
                       onChange={(e) => updateField(i, 'strike', parseFloat(e.target.value) || 0)}
                       className={cn(
-                        "h-9 text-right font-bold text-base pr-8",
+                        "h-9 text-right font-bold text-base pr-8 cursor-text",
                         isStock && "border-primary/40 bg-gradient-to-r from-primary/20 to-primary/10 text-primary font-black",
                         !isStock && "font-mono"
                       )}
-                      disabled={leg.option_type === 'stock'}
                     />
                     {isStock && hasPrice && (
                       <CheckCircle2 className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 text-success" />
@@ -121,11 +120,10 @@ export default function LegsTable({ legs, onRemove, onUpdate }: LegsTableProps) 
                       value={leg.price}
                       onChange={(e) => updateField(i, 'price', parseFloat(e.target.value) || 0)}
                       className={cn(
-                        "h-9 text-right font-bold text-base pr-8",
+                        "h-9 text-right font-bold text-base pr-8 cursor-text",
                         isStock && "border-primary/40 bg-gradient-to-r from-primary/20 to-primary/10 text-primary font-black",
                         !isStock && "font-mono"
                       )}
-                      disabled={isStock}
                     />
                     {isStock && !hasPrice && (
                       <AlertCircle className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 text-destructive" />

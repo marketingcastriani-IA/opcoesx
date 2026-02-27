@@ -184,23 +184,23 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <button
               onClick={() => setInputMode('image')}
-              className="group relative overflow-hidden rounded-2xl border-2 border-dashed border-primary/30 bg-gradient-to-br from-primary/5 via-card to-card p-8 text-left transition-all duration-300 hover:border-primary/60 hover:shadow-[0_0_50px_-12px_hsl(var(--primary)/0.3)] hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="group relative overflow-hidden rounded-2xl border-2 border-dashed border-cyan-400/50 bg-gradient-to-br from-cyan-500/10 via-cyan-500/5 to-card p-8 text-left transition-all duration-300 hover:border-cyan-400/80 hover:shadow-[0_0_50px_-12px_hsl(186,100%,50%/0.3)] hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
             >
-              <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -translate-y-8 translate-x-8 group-hover:bg-primary/10 transition-colors" />
+              <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-400/10 rounded-full blur-3xl -translate-y-8 translate-x-8 group-hover:bg-cyan-400/15 transition-colors" />
               <div className="relative space-y-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400/20 to-cyan-500/10 text-cyan-400 group-hover:from-cyan-400/30 group-hover:to-cyan-500/20 transition-colors">
                     <Camera className="h-7 w-7" />
                   </div>
                   <div>
-                    <Badge variant="outline" className="text-[9px] border-primary/40 text-primary mb-1">IA + OCR</Badge>
-                    <h3 className="text-xl font-bold">Upload de Imagem</h3>
+                    <Badge className="text-[9px] bg-cyan-500/20 text-cyan-400 border-cyan-400/40 mb-1">🤖 IA + OCR</Badge>
+                    <h3 className="text-xl font-bold text-cyan-400">Upload de Imagem</h3>
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Tire um <strong className="text-foreground">print da sua corretora</strong> (BTG, Profit, Clear) e a IA extrai automaticamente todas as pernas.
+                  Tire um <strong className="text-cyan-300">print da sua corretora</strong> (BTG, Profit, Clear) e a IA extrai automaticamente todas as pernas.
                 </p>
-                <div className="flex items-center gap-2 text-primary text-sm font-medium">
+                <div className="flex items-center gap-2 text-cyan-400 text-sm font-medium">
                   Começar com imagem <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                 </div>
               </div>
@@ -208,23 +208,23 @@ export default function Dashboard() {
 
             <button
               onClick={() => setInputMode('manual')}
-              className="group relative overflow-hidden rounded-2xl border-2 border-dashed border-border/60 bg-gradient-to-br from-muted/30 via-card to-card p-8 text-left transition-all duration-300 hover:border-primary/40 hover:shadow-[0_0_50px_-12px_hsl(var(--primary)/0.2)] hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="group relative overflow-hidden rounded-2xl border-2 border-dashed border-violet-400/50 bg-gradient-to-br from-violet-500/10 via-violet-500/5 to-card p-8 text-left transition-all duration-300 hover:border-violet-400/80 hover:shadow-[0_0_50px_-12px_hsl(280,100%,50%/0.3)] hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
             >
-              <div className="absolute top-0 right-0 w-32 h-32 bg-muted/30 rounded-full blur-3xl -translate-y-8 translate-x-8 group-hover:bg-primary/5 transition-colors" />
+              <div className="absolute top-0 right-0 w-32 h-32 bg-violet-400/10 rounded-full blur-3xl -translate-y-8 translate-x-8 group-hover:bg-violet-400/15 transition-colors" />
               <div className="relative space-y-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted/60 text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-400/20 to-violet-500/10 text-violet-400 group-hover:from-violet-400/30 group-hover:to-violet-500/20 transition-colors">
                     <Keyboard className="h-7 w-7" />
                   </div>
                   <div>
-                    <Badge variant="outline" className="text-[9px] border-border/60 text-muted-foreground mb-1">PRECISO</Badge>
-                    <h3 className="text-xl font-bold">Entrada Manual</h3>
+                    <Badge className="text-[9px] bg-violet-500/20 text-violet-400 border-violet-400/40 mb-1">⚙️ PRECISO</Badge>
+                    <h3 className="text-xl font-bold text-violet-400">Entrada Manual</h3>
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Insira manualmente cada perna: <strong className="text-foreground">ativo, strike, prêmio, quantidade</strong>. Controle total.
+                  Insira manualmente cada perna: <strong className="text-violet-300">ativo, strike, prêmio, quantidade</strong>. Controle total.
                 </p>
-                <div className="flex items-center gap-2 text-muted-foreground group-hover:text-primary text-sm font-medium transition-colors">
+                <div className="flex items-center gap-2 text-violet-400 group-hover:text-violet-300 text-sm font-medium transition-colors">
                   Inserir manualmente <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                 </div>
               </div>
@@ -233,24 +233,29 @@ export default function Dashboard() {
         ) : (
           <div className="space-y-4">
             <div className="flex items-center gap-2">
-              <button onClick={() => setInputMode('manual')} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all', inputMode === 'manual' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50')}>
+              <button onClick={() => setInputMode('manual')} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all', inputMode === 'manual' ? 'bg-violet-500/20 text-violet-400 border border-violet-400/40' : 'text-muted-foreground hover:text-violet-400 hover:bg-violet-500/10')}>
                 <Keyboard className="h-4 w-4" /> Manual
               </button>
-              <button onClick={() => setInputMode('image')} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all', inputMode === 'image' ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50')}>
+              <button onClick={() => setInputMode('image')} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all', inputMode === 'image' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-400/40' : 'text-muted-foreground hover:text-cyan-400 hover:bg-cyan-500/10')}>
                 <Camera className="h-4 w-4" /> Upload OCR
               </button>
             </div>
             {inputMode === 'manual' ? (
-              <Card className="border-border/40 bg-card/50 backdrop-blur-sm">
-                <CardHeader><CardTitle className="text-base">Adicionar Perna</CardTitle></CardHeader>
+              <Card className="border-2 border-violet-400/30 bg-gradient-to-br from-violet-500/5 to-card backdrop-blur-sm">
+                <CardHeader><CardTitle className="text-base text-violet-400">Adicionar Perna Manualmente</CardTitle></CardHeader>
                 <CardContent><LegForm onAdd={addLeg} /></CardContent>
               </Card>
             ) : (
-              <ImageUpload 
-                onLegsExtracted={handleLegsFromImage}
-                onImageChange={() => setLegs([])}
-              />
-            )}
+              <Card className="border-2 border-cyan-400/30 bg-gradient-to-br from-cyan-500/5 to-card backdrop-blur-sm">
+                <CardHeader><CardTitle className="text-base text-cyan-400">Upload de Imagem (OCR)</CardTitle></CardHeader>
+                <CardContent>
+                  <ImageUpload 
+                    onLegsExtracted={handleLegsFromImage}
+                    onImageChange={() => setLegs([])}
+                  />
+                </CardContent>
+              </Card>
+            )
           </div>
         )}
 

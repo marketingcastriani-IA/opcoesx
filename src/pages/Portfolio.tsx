@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, TrendingDown, Trash2, Plus, Calendar, DollarSign, Loader2, BarChart3, PieChart as PieChartIcon } from 'lucide-react';
+import { TrendingUp, TrendingDown, Trash2, Plus, Calendar, DollarSign, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ClosedOperation {
@@ -52,8 +52,6 @@ export default function Portfolio() {
     wins: operations.filter(op => op.profitLoss > 0).length,
     losses: operations.filter(op => op.profitLoss < 0).length,
     winRate: operations.length > 0 ? ((operations.filter(op => op.profitLoss > 0).length / operations.length) * 100).toFixed(1) : '0',
-    avgWin: operations.length > 0 ? (operations.filter(op => op.profitLoss > 0).reduce((sum, op) => sum + op.profitLoss, 0) / Math.max(operations.filter(op => op.profitLoss > 0).length, 1)).toFixed(2) : '0',
-    avgLoss: operations.length > 0 ? (operations.filter(op => op.profitLoss < 0).reduce((sum, op) => sum + op.profitLoss, 0) / Math.max(operations.filter(op => op.profitLoss < 0).length, 1)).toFixed(2) : '0',
   };
 
   const handleAddOperation = () => {
@@ -93,235 +91,190 @@ export default function Portfolio() {
       <main className="container py-6 space-y-6 animate-fade-in">
         {/* Header */}
         <div className="space-y-2">
-          <h1 className="text-4xl sm:text-5xl font-black tracking-tight bg-gradient-to-r from-primary via-purple-500 to-pink-500 bg-clip-text text-transparent">Portfólio de Operações</h1>
-          <p className="text-lg text-muted-foreground">Acompanhe suas operações encerradas, lucros e performance</p>
+          <h1 className="text-4xl sm:text-5xl font-black tracking-tight">Portfólio</h1>
+          <p className="text-lg text-muted-foreground">Acompanhe suas operações encerradas e lucros/prejuízos</p>
         </div>
 
-        {/* Stats Cards - Premium Layout */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
-          {/* Total P&L */}
-          <Card className={cn(
-            "relative overflow-hidden border-2 lg:col-span-2",
-            stats.totalPL >= 0 
-              ? "border-success/40 bg-gradient-to-br from-success/10 to-card" 
-              : "border-destructive/40 bg-gradient-to-br from-destructive/10 to-card"
-          )}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-muted-foreground">Total P&L</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className={cn(
-                  "text-3xl font-black",
-                  stats.totalPL >= 0 ? "text-success" : "text-destructive"
-                )}>
-                  R$ {Math.abs(stats.totalPL).toFixed(2)}
-                </div>
-                <div className="flex items-center gap-2">
-                  {stats.totalPL >= 0 ? (
-                    <TrendingUp className="h-4 w-4 text-success" />
-                  ) : (
-                    <TrendingDown className="h-4 w-4 text-destructive" />
-                  )}
-                  <span className={cn(
-                    "text-xs font-semibold",
-                    stats.totalPL >= 0 ? "text-success" : "text-destructive"
-                  )}>
-                    {stats.totalPL >= 0 ? '+' : ''}{((stats.totalPL / Math.max(Math.abs(stats.totalPL), 1)) * 100).toFixed(1)}%
-                  </span>
-                </div>
-              </div>
+        {/* Stats Cards */}
+        <div className="grid gap-4 sm:grid-cols-4">
+          <Card className="relative overflow-hidden border-2 border-primary/30 bg-gradient-to-br from-primary/8 to-card">
+            <CardContent className="p-4 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total P&L</p>
+              <p className={cn('text-2xl font-black', stats.totalPL >= 0 ? 'text-success' : 'text-destructive')}>
+                R$ {Math.abs(stats.totalPL).toFixed(2)}
+              </p>
+              <p className="text-xs text-muted-foreground">{operations.length} operações</p>
             </CardContent>
           </Card>
 
-          {/* Win Rate */}
-          <Card className="relative overflow-hidden border-2 border-blue-500/40 bg-gradient-to-br from-blue-500/10 to-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-muted-foreground">Taxa de Acerto</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="text-3xl font-black text-blue-500">{stats.winRate}%</div>
-                <div className="text-xs text-muted-foreground">{stats.wins}W / {stats.losses}L</div>
-              </div>
+          <Card className="relative overflow-hidden border-2 border-success/30 bg-gradient-to-br from-success/8 to-card">
+            <CardContent className="p-4 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ganhos</p>
+              <p className="text-2xl font-black text-success">{stats.wins}</p>
+              <p className="text-xs text-muted-foreground">operações lucrativas</p>
             </CardContent>
           </Card>
 
-          {/* Avg Win */}
-          <Card className="relative overflow-hidden border-2 border-success/40 bg-gradient-to-br from-success/10 to-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-muted-foreground">Ganho Médio</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="text-3xl font-black text-success">R$ {stats.avgWin}</div>
-                <div className="text-xs text-muted-foreground">{stats.wins} operações</div>
-              </div>
+          <Card className="relative overflow-hidden border-2 border-destructive/30 bg-gradient-to-br from-destructive/8 to-card">
+            <CardContent className="p-4 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Perdas</p>
+              <p className="text-2xl font-black text-destructive">{stats.losses}</p>
+              <p className="text-xs text-muted-foreground">operações com prejuízo</p>
             </CardContent>
           </Card>
 
-          {/* Avg Loss */}
-          <Card className="relative overflow-hidden border-2 border-destructive/40 bg-gradient-to-br from-destructive/10 to-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-muted-foreground">Perda Média</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="text-3xl font-black text-destructive">R$ {Math.abs(parseFloat(stats.avgLoss as string)).toFixed(2)}</div>
-                <div className="text-xs text-muted-foreground">{stats.losses} operações</div>
-              </div>
+          <Card className="relative overflow-hidden border-2 border-primary/30 bg-gradient-to-br from-primary/8 to-card">
+            <CardContent className="p-4 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Taxa de Acerto</p>
+              <p className="text-2xl font-black text-primary">{stats.winRate}%</p>
+              <p className="text-xs text-muted-foreground">taxa de sucesso</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Add Operation Button */}
-        <div className="flex justify-end">
-          <Button 
-            onClick={() => setShowForm(!showForm)}
-            className="gap-2 shadow-lg shadow-primary/50"
-          >
-            <Plus className="h-4 w-4" />
-            Nova Operação
-          </Button>
-        </div>
+        <Button
+          onClick={() => setShowForm(!showForm)}
+          className="text-base h-11 px-6 shadow-[0_0_30px_-8px_hsl(var(--primary)/0.4)]"
+        >
+          <Plus className="mr-2 h-5 w-5" />
+          Nova Operação Encerrada
+        </Button>
 
-        {/* Add Operation Form */}
+        {/* Add Form */}
         {showForm && (
-          <Card className="border-2 border-primary/40 bg-gradient-to-br from-primary/5 to-card">
+          <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-card">
             <CardHeader>
-              <CardTitle>Registrar Nova Operação</CardTitle>
+              <CardTitle>Registrar Operação Encerrada</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Nome da Operação</Label>
-                  <Input 
+                  <Input
                     placeholder="Ex: Compra Coberta PETR4"
                     value={formData.name}
-                    onChange={e => setFormData({...formData, name: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>Ativo</Label>
-                  <Input 
+                  <Input
                     placeholder="Ex: PETR4"
                     value={formData.asset}
-                    onChange={e => setFormData({...formData, asset: e.target.value.toUpperCase()})}
+                    onChange={(e) => setFormData({ ...formData, asset: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>Data de Entrada</Label>
-                  <Input 
+                  <Input
                     type="date"
                     value={formData.entryDate}
-                    onChange={e => setFormData({...formData, entryDate: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, entryDate: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>Data de Saída</Label>
-                  <Input 
+                  <Input
                     type="date"
                     value={formData.exitDate}
-                    onChange={e => setFormData({...formData, exitDate: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, exitDate: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>Lucro/Prejuízo (R$)</Label>
-                  <Input 
+                  <Input
                     type="number"
                     step="0.01"
                     placeholder="0.00"
-                    value={formData.profitLoss || ''}
-                    onChange={e => setFormData({...formData, profitLoss: parseFloat(e.target.value) || 0})}
+                    value={formData.profitLoss}
+                    onChange={(e) => setFormData({ ...formData, profitLoss: parseFloat(e.target.value) || 0 })}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>Estratégia</Label>
-                  <Input 
+                  <Input
                     placeholder="Ex: Covered Call"
                     value={formData.strategy}
-                    onChange={e => setFormData({...formData, strategy: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, strategy: e.target.value })}
                   />
                 </div>
               </div>
-              <div className="flex gap-2 justify-end">
-                <Button variant="outline" onClick={() => setShowForm(false)}>Cancelar</Button>
-                <Button onClick={handleAddOperation}>Adicionar</Button>
+              <div className="flex gap-2">
+                <Button onClick={handleAddOperation} className="flex-1">Salvar</Button>
+                <Button onClick={() => setShowForm(false)} variant="outline" className="flex-1">Cancelar</Button>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Operations Table */}
-        <Card className="border-2 border-border/40 bg-card/50 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              Histórico de Operações
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {operations.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                Nenhuma operação registrada ainda
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border/40">
-                      <th className="text-left py-3 px-4 font-semibold">Operação</th>
-                      <th className="text-left py-3 px-4 font-semibold">Ativo</th>
-                      <th className="text-left py-3 px-4 font-semibold">Estratégia</th>
-                      <th className="text-left py-3 px-4 font-semibold">Entrada</th>
-                      <th className="text-left py-3 px-4 font-semibold">Saída</th>
-                      <th className="text-right py-3 px-4 font-semibold">P&L</th>
-                      <th className="text-center py-3 px-4 font-semibold">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {operations.map(op => (
-                      <tr 
-                        key={op.id}
-                        className={cn(
-                          "border-b border-border/20 hover:bg-primary/5 transition-colors",
-                          deleting === op.id && "opacity-50"
-                        )}
-                      >
-                        <td className="py-3 px-4 font-semibold">{op.name}</td>
-                        <td className="py-3 px-4"><Badge variant="outline">{op.asset}</Badge></td>
-                        <td className="py-3 px-4 text-xs text-muted-foreground">{op.strategy}</td>
-                        <td className="py-3 px-4 text-xs">{new Date(op.entryDate).toLocaleDateString('pt-BR')}</td>
-                        <td className="py-3 px-4 text-xs">{new Date(op.exitDate).toLocaleDateString('pt-BR')}</td>
-                        <td className={cn(
-                          "py-3 px-4 text-right font-black",
-                          op.profitLoss >= 0 ? "text-success" : "text-destructive"
-                        )}>
-                          {op.profitLoss >= 0 ? '+' : ''}R$ {op.profitLoss.toFixed(2)}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(op.id)}
-                            disabled={deleting === op.id}
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                          >
-                            {deleting === op.id ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Operations List */}
+        <div className="space-y-3">
+          {operations.map((op) => (
+            <Card key={op.id} className="relative overflow-hidden border-2 transition-all hover:shadow-lg group">
+              <CardContent className="p-5 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4 flex-1">
+                  <div className={cn(
+                    'flex h-12 w-12 items-center justify-center rounded-lg',
+                    op.profitLoss >= 0
+                      ? 'bg-success/20 text-success'
+                      : 'bg-destructive/20 text-destructive'
+                  )}>
+                    {op.profitLoss >= 0 ? <TrendingUp className="h-6 w-6" /> : <TrendingDown className="h-6 w-6" />}
+                  </div>
+
+                  <div className="flex-1 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-bold text-base">{op.name}</p>
+                      <Badge variant="outline" className="text-xs">{op.asset}</Badge>
+                      <Badge className="text-xs bg-primary/20 text-primary border-primary/30">{op.strategy}</Badge>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {op.entryDate} → {op.exitDate}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <div className="text-right space-y-1">
+                    <p className={cn('text-lg font-black', op.profitLoss >= 0 ? 'text-success' : 'text-destructive')}>
+                      {op.profitLoss >= 0 ? '+' : ''}R$ {op.profitLoss.toFixed(2)}
+                    </p>
+                    <p className={cn('text-xs font-semibold', op.profitLoss >= 0 ? 'text-success' : 'text-destructive')}>
+                      {op.profitLoss >= 0 ? '+' : ''}{op.percentage.toFixed(1)}%
+                    </p>
+                  </div>
+
+                  <Button
+                    onClick={() => handleDelete(op.id)}
+                    variant="ghost"
+                    size="sm"
+                    disabled={deleting === op.id}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    {deleting === op.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {operations.length === 0 && !showForm && (
+          <Card className="border-dashed border-2 border-muted-foreground/30">
+            <CardContent className="p-12 text-center space-y-3">
+              <p className="text-muted-foreground font-medium">Nenhuma operação encerrada registrada</p>
+              <p className="text-sm text-muted-foreground">Clique em "Nova Operação Encerrada" para começar</p>
+            </CardContent>
+          </Card>
+        )}
       </main>
     </div>
   );

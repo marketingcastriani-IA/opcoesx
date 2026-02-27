@@ -121,7 +121,7 @@ const normalizeLegs = (legs: RawLeg[] | undefined) => {
 
         console.log(`Leg ${idx}: Ativo ${asset} com preço ${assetPrice || 'não encontrado - será preenchido depois'}`);
         strike = assetPrice > 0 ? assetPrice : 0;
-        price = 0;
+        price = assetPrice > 0 ? assetPrice : 0;
       } else {
         if (strike <= 0) {
           console.warn(`Leg ${idx}: Strike inválido (${strikeRaw})`);

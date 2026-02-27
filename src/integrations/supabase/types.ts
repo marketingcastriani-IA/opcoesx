@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           ai_suggestion: string | null
           cdi_rate: number | null
+          closed_at: string | null
           created_at: string
           days_to_expiry: number | null
           id: string
@@ -30,6 +31,7 @@ export type Database = {
         Insert: {
           ai_suggestion?: string | null
           cdi_rate?: number | null
+          closed_at?: string | null
           created_at?: string
           days_to_expiry?: number | null
           id?: string
@@ -42,6 +44,7 @@ export type Database = {
         Update: {
           ai_suggestion?: string | null
           cdi_rate?: number | null
+          closed_at?: string | null
           created_at?: string
           days_to_expiry?: number | null
           id?: string

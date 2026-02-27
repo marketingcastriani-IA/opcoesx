@@ -74,6 +74,7 @@ export default function LegsTable({ legs, onRemove, onUpdate }: LegsTableProps) 
                   value={leg.strike}
                   onChange={(e) => updateField(i, 'strike', parseFloat(e.target.value) || 0)}
                   className="h-8 text-right font-mono"
+                  disabled={leg.option_type === 'stock'}
                 />
               </TableCell>
               <TableCell>
@@ -106,4 +107,3 @@ export default function LegsTable({ legs, onRemove, onUpdate }: LegsTableProps) 
     </div>
   );
 }
-

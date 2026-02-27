@@ -11,7 +11,7 @@ interface MetricsCardsProps {
 }
 
 export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsProps) {
-  const isCollar = !!metrics.strategyType;
+  const isCollar = metrics.strategyType === 'Collar';
   const montageValue = isCollar ? metrics.montageTotal ?? 0 : metrics.netCost;
   const breakeven = isCollar && metrics.realBreakeven ? metrics.realBreakeven : null;
 

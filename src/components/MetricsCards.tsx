@@ -14,6 +14,8 @@ export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsPro
   const hasStrategy = !!metrics.strategyType;
   const isCoveredCall = metrics.strategyType === 'CoveredCall';
   const isCollar = metrics.strategyType === 'Collar';
+  const isBullCallSpread = metrics.strategyType === 'BullCallSpread';
+  const isBearPutSpread = metrics.strategyType === 'BearPutSpread';
 
   // Custo de montagem: para estratégias detectadas usa montageTotal, senão netCost
   const montageValue = hasStrategy
@@ -22,7 +24,7 @@ export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsPro
 
   // Breakeven: usa o breakeven real da estratégia se disponível
   const breakeven = hasStrategy && metrics.realBreakeven != null
-    ? metrics.realBreakeven
+    ? (Array.isArray(metrics.realBreakeven) ? metrics.realBreakeven : [metrics.realBreakeven])
     : null;
 
   // Lucro máximo
@@ -41,23 +43,29 @@ export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsPro
     : null;
 
   // Rótulos dinâmicos por estratégia
-  const costLabel = isCoveredCall
+  const costLabel = isCoveredCall || isCollar || isBullCallSpread || isBearPutSpread
     ? 'Custo de Montagem'
-    : isCollar
-      ? 'Custo de Montagem'
-      : 'Custo Líquido';
+    : 'Custo Líquido';
 
   const costTip = isCoveredCall
     ? 'Desembolso total: (Preço Ativo - Prêmio Call) × Qtd'
     : isCollar
       ? 'Desembolso total: (Ativo + Put - Call) × Qtd'
-      : 'Valor líquido recebido (+) ou pago (-) ao montar a estrutura.';
+      : isBullCallSpread
+        ? 'Débito líquido: (Prêmio Call Comprada - Prêmio Call Vendida) × Qtd'
+        : isBearPutSpread
+          ? 'Débito líquido: (Prêmio Put Comprada - Prêmio Put Vendida) × Qtd'
+          : 'Valor líquido recebido (+) ou pago (-) ao montar a estrutura.';
 
   const maxGainTip = isCoveredCall
     ? '(Strike Call - Breakeven) × Qtd — ganho limitado pelo strike da call vendida'
     : isCollar
       ? '(Strike Call - Breakeven) × Qtd'
-      : 'Maior lucro possível no vencimento.';
+      : isBullCallSpread
+        ? '(Strike Call Vendida - Strike Call Comprada - Débito Líquido por ação) × Qtd'
+        : isBearPutSpread
+          ? '(Strike Put Comprada - Strike Put Vendida - Débito Líquido por ação) × Qtd'
+          : 'Maior lucro possível no vencimento.';
 
   const maxLossTip = metrics.isRiskFree
     ? 'Strike da Put ≥ Breakeven: lucro garantido em qualquer cenário.'
@@ -65,14 +73,22 @@ export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsPro
       ? 'Custo de montagem total (ativo vai a zero)'
       : isCollar
         ? '(Breakeven - Strike Put) × Qtd'
-        : 'Maior prejuízo possível no vencimento.';
+        : isBullCallSpread
+          ? 'Débito Líquido Total'
+          : isBearPutSpread
+            ? 'Débito Líquido Total'
+            : 'Maior prejuízo possível no vencimento.';
 
   const breakevenLabel = hasStrategy ? 'Breakeven Real' : 'Breakeven';
   const breakevenTip = isCoveredCall
     ? 'Preço do ativo onde a operação não dá lucro nem prejuízo: Custo de Montagem ÷ Qtd'
     : isCollar
       ? 'Custo Total de Montagem ÷ Quantidade'
-      : 'Preço do ativo onde a operação não dá lucro nem prejuízo.';
+      : isBullCallSpread
+        ? 'Strike da Call Comprada + Débito Líquido por ação'
+        : isBearPutSpread
+          ? 'Strike da Put Comprada - Débito Líquido por ação'
+          : 'Preço do ativo onde a operação não dá lucro nem prejuízo.';
 
   const items = [
     {
@@ -112,7 +128,9 @@ export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsPro
     {
       title: breakevenLabel,
       value: breakeven !== null
-        ? `R$ ${breakeven.toFixed(2)}`
+        ? (Array.isArray(breakeven)
+          ? breakeven.map(b => `R$ ${b.toFixed(2)}`).join(' | ')
+          : `R$ ${breakeven[0].toFixed(2)}`)
         : (metrics.breakevens.length > 0
           ? metrics.breakevens.map(b => `R$ ${b.toFixed(2)}`).join(' | ')
           : 'N/A'),

@@ -36,7 +36,7 @@ export interface AnalysisMetrics {
   strategyType?: string;
   strategyLabel?: string;
   montageTotal?: number;
-  realBreakeven?: number;
+  realBreakeven?: number | number[]; // Updated to allow array
   isRiskFree?: boolean;
   cdiReturn?: number;
   cdiEfficiency?: number;

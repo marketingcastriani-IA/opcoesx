@@ -1,7 +1,8 @@
 import { PayoffPoint } from '@/lib/types';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { Area, AreaChart, CartesianGrid, ReferenceLine, XAxis, YAxis, Line, ComposedChart } from 'recharts';
+import { ChartContainer } from '@/components/ui/chart';
+import { Area, AreaChart, CartesianGrid, ReferenceLine, XAxis, YAxis, Line, ComposedChart, Tooltip } from 'recharts';
 import { calculateCDIReturn } from '@/lib/payoff';
+import { cn } from '@/lib/utils';
 
 interface PayoffChartProps {
   data: PayoffPoint[];
@@ -34,10 +35,12 @@ export default function PayoffChart({ data, breakevens, cdiRate = 0, daysToExpir
   const chartData = sortedData.map((p) => {
     const profit = p.profitAtExpiry;
     const cdi = cdiValue ?? 0;
+    const pctReturn = investedCapital > 0 ? (profit / investedCapital) * 100 : 0;
 
     return {
       price: p.price,
       profitAtExpiry: profit,
+      pctReturn: Math.round(pctReturn * 100) / 100,
       // Zones for area fills
       belowZero: profit < 0 ? profit : 0,
       betweenZeroCdi: profit > 0 && cdi > 0
@@ -89,16 +92,27 @@ export default function PayoffChart({ data, breakevens, cdiRate = 0, daysToExpir
           fontSize={11}
         />
         <YAxis
+          yAxisId="left"
           domain={[minProfit - padding, maxProfit + padding]}
-          tickFormatter={(v) => v.toFixed(0)}
+          tickFormatter={(v) => `R$${v.toFixed(0)}`}
           className="text-xs"
           stroke="hsl(var(--muted-foreground))"
-          fontSize={11}
+          fontSize={10}
+          width={60}
+        />
+        <YAxis
+          yAxisId="right"
+          orientation="right"
+          domain={[((minProfit - padding) / investedCapital) * 100, ((maxProfit + padding) / investedCapital) * 100]}
+          tickFormatter={(v) => `${v.toFixed(0)}%`}
+          className="text-xs"
+          stroke="hsl(var(--muted-foreground))"
+          fontSize={10}
           width={50}
         />
         
         {/* Zero line */}
-        <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" strokeOpacity={0.5} />
+        <ReferenceLine yAxisId="left" y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" strokeOpacity={0.5} />
         
         {/* Breakeven markers */}
         {breakevens.map((be, i) => (
@@ -121,6 +135,7 @@ export default function PayoffChart({ data, breakevens, cdiRate = 0, daysToExpir
         {/* CDI benchmark line */}
         {cdiValue !== null && (
           <ReferenceLine
+            yAxisId="left"
             y={cdiValue}
             stroke="hsl(45 95% 55%)"
             strokeWidth={2}
@@ -135,10 +150,30 @@ export default function PayoffChart({ data, breakevens, cdiRate = 0, daysToExpir
           />
         )}
         
-        <ChartTooltip content={<ChartTooltipContent />} />
+        <Tooltip
+          content={({ active, payload }) => {
+            if (!active || !payload?.length) return null;
+            const d = payload[0]?.payload;
+            if (!d) return null;
+            const profit = d.profitAtExpiry as number;
+            const pct = d.pctReturn as number;
+            return (
+              <div className="rounded-lg border bg-background p-3 shadow-lg space-y-1">
+                <p className="text-xs text-muted-foreground">Spot: R$ {d.price.toFixed(2)}</p>
+                <p className={cn("text-sm font-bold", profit >= 0 ? "text-success" : "text-destructive")}>
+                  {profit >= 0 ? '+' : ''}R$ {profit.toFixed(2)}
+                </p>
+                <p className={cn("text-xs font-semibold", pct >= 0 ? "text-success" : "text-destructive")}>
+                  {pct >= 0 ? '+' : ''}{pct.toFixed(2)}%
+                </p>
+              </div>
+            );
+          }}
+        />
         
         {/* Loss zone (red) */}
         <Area
+          yAxisId="left"
           type="monotone"
           dataKey="belowZero"
           stroke="none"
@@ -149,6 +184,7 @@ export default function PayoffChart({ data, breakevens, cdiRate = 0, daysToExpir
         />
         {/* Profit below CDI zone (orange) */}
         <Area
+          yAxisId="left"
           type="monotone"
           dataKey="betweenZeroCdi"
           stackId="positive"
@@ -160,6 +196,7 @@ export default function PayoffChart({ data, breakevens, cdiRate = 0, daysToExpir
         />
         {/* Profit above CDI zone (green) */}
         <Area
+          yAxisId="left"
           type="monotone"
           dataKey="aboveCdi"
           stackId="positive"
@@ -172,6 +209,7 @@ export default function PayoffChart({ data, breakevens, cdiRate = 0, daysToExpir
         
         {/* Main payoff line */}
         <Line
+          yAxisId="left"
           type="monotone"
           dataKey="profitAtExpiry"
           stroke="hsl(var(--chart-profit))"

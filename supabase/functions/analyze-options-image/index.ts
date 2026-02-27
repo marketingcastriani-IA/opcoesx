@@ -93,52 +93,42 @@ const normalizeLegs = (legs: RawLeg[] | undefined) => {
       let price = priceRaw;
 
       if (optionType === "stock") {
-        // VALIDAÇÃO QUÍNTUPLA: Preço de Ativo com máxima prioridade
+        // Para ativo-objeto: o preço deve estar em strike ou price
         let assetPrice = 0;
 
-        // Tentativa 1: price > 0 (campo de preço do prêmio)
+        // Prioridade 1: price > 0 (campo Preço da corretora)
         if (priceRaw > 0) {
-          console.log(`Leg ${idx}: Preço encontrado no campo PRICE: ${priceRaw}`);
           assetPrice = priceRaw;
         }
-        // Tentativa 2: strike > 0 (campo de strike)
+        // Prioridade 2: strike > 0 (campo Strike pode ter o preço)
         else if (strikeRaw > 0) {
-          console.log(`Leg ${idx}: Preço encontrado no campo STRIKE: ${strikeRaw}`);
           assetPrice = strikeRaw;
         }
-        // Tentativa 3: Busca em strings adicionais (fallback)
+        // Prioridade 3: extrai de strings
         else {
-          // Tenta extrair de price como string
           if (leg.price && typeof leg.price === "string") {
             const extracted = toNumber(leg.price);
-            if (extracted > 0) {
-              console.log(`Leg ${idx}: Preço extraído de string PRICE: ${extracted}`);
-              assetPrice = extracted;
-            }
+            if (extracted > 0) assetPrice = extracted;
           }
-          // Tenta extrair de strike como string
           if (assetPrice === 0 && leg.strike && typeof leg.strike === "string") {
             const extracted = toNumber(leg.strike);
-            if (extracted > 0) {
-              console.log(`Leg ${idx}: Preço extraído de string STRIKE: ${extracted}`);
-              assetPrice = extracted;
-            }
+            if (extracted > 0) assetPrice = extracted;
           }
         }
 
         if (assetPrice <= 0) {
-          console.error(`Leg ${idx}: ERRO CRÍTICO - Preço do ativo não encontrado. Strike: ${strikeRaw}, Price: ${priceRaw}, Raw Strike: ${leg.strike}, Raw Price: ${leg.price}`);
+          console.error(`Leg ${idx}: ERRO - Preço do ativo não encontrado. Strike: ${strikeRaw}, Price: ${priceRaw}`);
           return null;
         }
 
-        // Validação: preço de ação deve estar entre 0.01 e 10000
         if (assetPrice < 0.01 || assetPrice > 10000) {
-          console.error(`Leg ${idx}: Preço de ativo fora do intervalo válido: ${assetPrice}`);
+          console.error(`Leg ${idx}: Preço fora do intervalo: ${assetPrice}`);
           return null;
         }
 
+        // CORREÇÃO: para stock, strike = preço E price = preço (para cálculos de payoff)
         strike = assetPrice;
-        price = 0;
+        price = assetPrice;
       } else {
         // Validação para opções
         if (strike <= 0) {

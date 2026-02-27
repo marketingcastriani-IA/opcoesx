@@ -22,9 +22,13 @@ export default function LegForm({ onAdd }: LegFormProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const requiresStrike = leg.option_type !== 'stock';
-    if (!leg.asset || leg.quantity < 1 || leg.price < 0 || (requiresStrike && leg.strike <= 0)) return;
-    onAdd({ ...leg, strike: requiresStrike ? leg.strike : 0 });
+    if (!leg.asset) return;
+    if (leg.quantity <= 0) return;
+    if (leg.price < 0) return;
+    if (leg.option_type !== 'stock' && leg.strike <= 0) return;
+
+    const strike = leg.option_type === 'stock' && leg.strike <= 0 ? leg.price : leg.strike;
+    onAdd({ ...leg, strike });
     setLeg(prev => ({ ...prev, strike: 0, price: 0, quantity: 1 }));
   };
 
@@ -42,16 +46,12 @@ export default function LegForm({ onAdd }: LegFormProps) {
       </div>
       <div className="space-y-1">
         <Label className="text-xs">Tipo</Label>
-        <Select
-          value={leg.option_type}
-          onValueChange={v =>
-            setLeg(p => {
-              const next = { ...p, option_type: v as 'call' | 'put' | 'stock' };
-              if (v === 'stock') next.strike = 0;
-              return next;
-            })
-          }
-        >
+        <Select value={leg.option_type} onValueChange={v => setLeg(p => {
+          const option_type = v as 'call' | 'put' | 'stock';
+          return option_type === 'stock'
+            ? { ...p, option_type, strike: p.price || 0 }
+            : { ...p, option_type };
+        })}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="call">Call</SelectItem>
@@ -69,15 +69,26 @@ export default function LegForm({ onAdd }: LegFormProps) {
         <Input
           type="number"
           step="0.01"
-          value={leg.option_type === 'stock' ? '' : (leg.strike || '')}
+          value={leg.option_type === 'stock' ? (leg.price || '') : (leg.strike || '')}
           onChange={e => setLeg(p => ({ ...p, strike: parseFloat(e.target.value) || 0 }))}
-          placeholder={leg.option_type === 'stock' ? 'N/A' : '30.00'}
+          placeholder="30.00"
           disabled={leg.option_type === 'stock'}
         />
       </div>
       <div className="space-y-1">
         <Label className="text-xs">Preço</Label>
-        <Input type="number" step="0.01" value={leg.price || ''} onChange={e => setLeg(p => ({ ...p, price: parseFloat(e.target.value) || 0 }))} placeholder="1.50" />
+        <Input
+          type="number"
+          step="0.01"
+          value={leg.price || ''}
+          onChange={e => setLeg(p => {
+            const price = parseFloat(e.target.value) || 0;
+            return p.option_type === 'stock'
+              ? { ...p, price, strike: price }
+              : { ...p, price };
+          })}
+          placeholder="1.50"
+        />
       </div>
       <div className="flex gap-2 items-end">
         <div className="space-y-1 flex-1">

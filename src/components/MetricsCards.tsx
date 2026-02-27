@@ -11,9 +11,9 @@ interface MetricsCardsProps {
 }
 
 export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsProps) {
-  const isCollar = metrics.strategyType === 'Collar';
+  const isCollar = !!metrics.strategyType;
   const montageValue = isCollar ? metrics.montageTotal ?? 0 : metrics.netCost;
-  const breakeven = isCollar && metrics.realBreakeven ? metrics.realBreakeven : null;
+  const breakeven = isCollar && metrics.realBreakeven !== null && metrics.realBreakeven !== undefined ? metrics.realBreakeven : null;
 
   const maxGainValue = isCollar
     ? (typeof metrics.maxGain === 'number' ? metrics.maxGain : null)
@@ -72,7 +72,7 @@ export default function MetricsCards({ metrics, cdiReturn = 0 }: MetricsCardsPro
     },
     {
       title: isCollar ? 'Breakeven Real' : 'Breakeven',
-      value: breakeven
+      value: breakeven !== null
         ? `R$ ${breakeven.toFixed(2)}`
         : (metrics.breakevens.length > 0
           ? metrics.breakevens.map(b => `R$ ${b.toFixed(2)}`).join(' | ')

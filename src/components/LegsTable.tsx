@@ -15,20 +15,19 @@ export default function LegsTable({ legs, onRemove, onUpdate }: LegsTableProps) 
 
   const updateField = (index: number, field: keyof Leg, value: string | number) => {
     const current = legs[index];
-    const updated: Leg = {
+    let updated: Leg = {
       ...current,
       [field]: value,
     } as Leg;
-    onUpdate(index, updated);
-  };
 
-  const updateOptionType = (index: number, value: 'call' | 'put' | 'stock') => {
-    const current = legs[index];
-    onUpdate(index, {
-      ...current,
-      option_type: value,
-      strike: value === 'stock' ? 0 : current.strike,
-    });
+    if (field === 'option_type' && value === 'stock') {
+      updated = { ...updated, strike: current.price };
+    }
+    if (field === 'price' && current.option_type === 'stock') {
+      updated = { ...updated, strike: Number(value) || 0 };
+    }
+
+    onUpdate(index, updated);
   };
 
   return (
@@ -61,7 +60,7 @@ export default function LegsTable({ legs, onRemove, onUpdate }: LegsTableProps) 
               <TableCell>
                 <select
                   value={leg.option_type}
-                  onChange={(e) => updateOptionType(i, e.target.value as 'call' | 'put' | 'stock')}
+                  onChange={(e) => updateField(i, 'option_type', e.target.value as 'call' | 'put' | 'stock')}
                   className="h-8 rounded-md border border-input bg-background px-2 text-xs"
                 >
                   <option value="call">Call</option>
@@ -80,10 +79,9 @@ export default function LegsTable({ legs, onRemove, onUpdate }: LegsTableProps) 
                 <Input
                   type="number"
                   step="0.01"
-                  value={leg.option_type === 'stock' ? '' : leg.strike}
+                  value={leg.option_type === 'stock' ? leg.price : leg.strike}
                   onChange={(e) => updateField(i, 'strike', parseFloat(e.target.value) || 0)}
                   className="h-8 text-right font-mono"
-                  placeholder={leg.option_type === 'stock' ? 'N/A' : '0.00'}
                   disabled={leg.option_type === 'stock'}
                 />
               </TableCell>

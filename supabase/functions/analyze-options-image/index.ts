@@ -32,11 +32,39 @@ const normalizeSide = (value?: string, optionType?: string) => {
   return null;
 };
 
-const normalizeOptionType = (value?: string) => {
+const normalizeOptionType = (value?: string, asset?: string) => {
   const raw = typeof value === "string" ? value.trim().toUpperCase() : "";
+  
+  // Detecção direta
   if (raw === "CALL" || raw === "C") return "call";
   if (raw === "PUT" || raw === "P") return "put";
-  if (raw === "STOCK" || raw === "AÇÃO" || raw === "ACAO" || raw === "ATIVO" || raw === "BASE") return "stock";
+  if (raw === "STOCK" || raw === "AÇÃO" || raw === "ACAO" || raw === "ATIVO" || raw === "BASE" || raw === "-" || raw === "") {
+    return "stock";
+  }
+  
+  // Se o campo está vazio ou é "-", tenta inferir pelo ticker
+  if ((!raw || raw === "-") && asset) {
+    const assetUpper = asset.toUpperCase();
+    // Tickers de opções têm 7+ caracteres e contêm letras de mês (A-L para calls, M-X para puts)
+    if (assetUpper.length >= 7) {
+      const monthLetter = assetUpper[4];
+      if (/[A-L]/.test(monthLetter)) return "call";
+      if (/[M-X]/.test(monthLetter)) return "put";
+    }
+    // Se é apenas 4-5 caracteres, é ativo-objeto
+    if (assetUpper.length <= 5) return "stock";
+  }
+  
+  return null;
+};
+
+const validateAsset = (asset?: string): string | null => {
+  if (!asset) return null;
+  const cleaned = asset.trim().toUpperCase();
+  // Ticker válido: 4-7 caracteres alfanuméricos
+  if (/^[A-Z0-9]{4,7}$/.test(cleaned)) {
+    return cleaned;
+  }
   return null;
 };
 
@@ -44,19 +72,64 @@ const normalizeLegs = (legs: RawLeg[] | undefined) => {
   if (!Array.isArray(legs)) return [];
 
   return legs
-    .map((leg) => {
-      const optionType = normalizeOptionType(leg.option_type) ?? (leg.option_type === "stock" ? "stock" : null);
-      const side = normalizeSide(leg.side, optionType ?? undefined);
-      const asset = typeof leg.asset === "string" ? leg.asset.trim().toUpperCase() : "";
+    .map((leg, idx) => {
+      // Validação de ativo primeiro
+      const asset = validateAsset(leg.asset);
+      if (!asset) {
+        console.warn(`Leg ${idx}: Asset inválido ou vazio:`, leg.asset);
+        return null;
+      }
+
+      // Detecção de tipo de opção
+      const optionType = normalizeOptionType(leg.option_type, asset);
+      if (!optionType) {
+        console.warn(`Leg ${idx}: Tipo de opção não reconhecido:`, leg.option_type);
+        return null;
+      }
+
+      // Detecção de lado
+      const side = normalizeSide(leg.side, optionType);
+      if (!side) {
+        console.warn(`Leg ${idx}: Lado (Compra/Venda) não reconhecido:`, leg.side);
+        return null;
+      }
+
+      // Processamento de strike e price
       const strikeRaw = toNumber(leg.strike);
       const priceRaw = toNumber(leg.price);
-      const strike = optionType === "stock" ? (strikeRaw > 0 ? strikeRaw : priceRaw) : strikeRaw;
-      const price = optionType === "stock" ? 0 : priceRaw;
-      const rawQty = Math.max(1, Math.round(toNumber(leg.quantity) || 1));
+
+      let strike = strikeRaw;
+      let price = priceRaw;
+
+      if (optionType === "stock") {
+        // Para ativo-objeto: strike é o preço de compra/venda, price é 0
+        strike = strikeRaw > 0 ? strikeRaw : priceRaw;
+        price = 0;
+        
+        if (strike <= 0) {
+          console.warn(`Leg ${idx}: Preço do ativo inválido (${strikeRaw}, ${priceRaw})`);
+          return null;
+        }
+      } else {
+        // Para opções: strike é o preço de exercício, price é o prêmio
+        if (strike <= 0) {
+          console.warn(`Leg ${idx}: Strike inválido (${strikeRaw})`);
+          return null;
+        }
+        if (price <= 0) {
+          console.warn(`Leg ${idx}: Prêmio inválido (${priceRaw})`);
+          return null;
+        }
+      }
+
+      // Validação de quantidade
+      const rawQty = Math.max(1, Math.round(toNumber(leg.quantity) || 100));
       const quantity = Math.abs(rawQty);
 
-      if (!side || !optionType || !asset || strike <= 0) return null;
-      if (optionType !== "stock" && price <= 0) return null;
+      if (quantity <= 0) {
+        console.warn(`Leg ${idx}: Quantidade inválida (${rawQty})`);
+        return null;
+      }
 
       return {
         side,
@@ -101,26 +174,59 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `Você é especialista em leitura de screenshots de plataformas brasileiras de opções (Clear, XP, BTG, Rico, Inter, etc).
+            content: `Você é especialista em leitura de screenshots de plataformas brasileiras de opções (Clear, XP, BTG, Rico, Inter, Nubank, etc).
 
-OBJETIVO: Extrair TODAS as pernas da grade de ordens/book de ofertas. NÃO invente pernas. NÃO omita pernas.
+OBJETIVO: Extrair TODAS as pernas da grade de ordens/book de ofertas com 100% de precisão. NÃO invente pernas. NÃO omita pernas.
 
-REGRAS CRÍTICAS:
-1. side: "buy" para Compra (C), "sell" para Venda (V) — regra estrita (C = COMPRA, V = VENDA)
-2. option_type: "call" para Call/C, "put" para Put/P, "stock" para ativo-objeto (quando o campo Call/Put mostra "-", "Ação", está vazio ou é o próprio ticker base como PETR4)
-3. asset: ticker em maiúsculas (ex: PETR4, VALE3, PETRD325, etc)
-4. strike: preço de exercício como número decimal. Para pernas "stock", use o preço unitário de compra/venda do ativo
-5. price: prêmio da opção como número decimal. Para pernas "stock", use 0
-6. quantity: quantidade inteira >= 1 (o app interpretará o sinal pela side). Nunca envie quantidade negativa.
+REGRAS CRÍTICAS DE EXTRAÇÃO:
 
-DUPLA VERIFICAÇÃO: Conte quantas linhas a tabela da imagem possui. O número de pernas extraídas DEVE ser igual ao número de linhas. Se faltar alguma, revise.
+1. **SIDE (Compra/Venda)**:
+   - "buy" para Compra, C, Comprar
+   - "sell" para Venda, V, Vender
+   - Regra estrita: C = COMPRA (buy), V = VENDA (sell)
 
-ATENÇÃO ESPECIAL: Linhas sem indicação Call/Put (campo vazio, "-" ou mostrando o ativo base) são pernas de ATIVO-OBJETO (stock). NÃO as descarte.`,
+2. **OPTION_TYPE (Tipo de Instrumento)**:
+   - "call" para Call, C (quando no campo de tipo)
+   - "put" para Put, P (quando no campo de tipo)
+   - "stock" para Ativo-Objeto (quando o campo Call/Put mostra "-", está vazio, mostra "Ação", ou é o ticker base como PETR4, VALE3, etc)
+   - IMPORTANTE: Se uma linha tem um ticker base (ex: PETR4) sem indicação Call/Put, é um ativo-objeto (stock)
+
+3. **ASSET (Ticker)**:
+   - Sempre em MAIÚSCULAS
+   - Exemplos válidos: PETR4, VALE3, PETRC405, PETRE30, PETRD325
+   - Para opções: ticker base + letra de mês (A-L para calls, M-X para puts) + strike
+   - Para ativos: ticker base apenas (4-5 caracteres)
+
+4. **STRIKE (Preço de Exercício)**:
+   - Para opções: preço de exercício como número decimal (ex: 39.65, 30.00)
+   - Para ativos (stock): use o preço unitário de compra/venda do ativo
+
+5. **PRICE (Prêmio/Preço)**:
+   - Para opções: prêmio como número decimal (ex: 0.80, 1.50)
+   - Para ativos (stock): use 0 (zero)
+
+6. **QUANTITY (Quantidade)**:
+   - Número inteiro >= 1
+   - Nunca envie quantidade negativa
+   - Padrão: 100 se não especificado
+
+DUPLA VERIFICAÇÃO OBRIGATÓRIA:
+- Conte quantas linhas a tabela da imagem possui
+- O número de pernas extraídas DEVE ser igual ao número de linhas
+- Se faltar alguma perna, revise e inclua
+
+EXEMPLO DE ESTRUTURA CORRETA (Compra Coberta):
+Linha 1: side=sell, option_type=call, asset=PETRC405, strike=39.65, price=0.80, quantity=100
+Linha 2: side=buy, option_type=stock, asset=PETR4, strike=39.61, price=0, quantity=100
+
+EXEMPLO DE ESTRUTURA CORRETA (Trava de Alta):
+Linha 1: side=buy, option_type=call, asset=PETRD30, strike=30.00, price=1.50, quantity=100
+Linha 2: side=sell, option_type=call, asset=PETRD32, strike=32.00, price=0.50, quantity=100`,
           },
           {
             role: "user",
             content: [
-              { type: "text", text: "Extraia TODAS as pernas da operação desta imagem. Cada linha da tabela é uma perna. Não omita nenhuma." },
+              { type: "text", text: "Extraia TODAS as pernas da operação desta imagem com máxima precisão. Cada linha da tabela é uma perna. Não omita nenhuma. Valide que o número total de pernas extraídas corresponde ao número de linhas visíveis na tabela." },
               { type: "image_url", image_url: { url: resolvedImage } },
             ],
           },
@@ -130,7 +236,7 @@ ATENÇÃO ESPECIAL: Linhas sem indicação Call/Put (campo vazio, "-" ou mostran
             type: "function",
             function: {
               name: "extract_legs",
-              description: "Extrai todas as pernas de opções/ações da imagem",
+              description: "Extrai todas as pernas de opções/ações da imagem com validação de precisão",
               parameters: {
                 type: "object",
                 properties: {
@@ -139,12 +245,12 @@ ATENÇÃO ESPECIAL: Linhas sem indicação Call/Put (campo vazio, "-" ou mostran
                     items: {
                       type: "object",
                       properties: {
-                        side: { type: "string", enum: ["buy", "sell"] },
-                        option_type: { type: "string", enum: ["call", "put", "stock"] },
-                        asset: { type: "string" },
-                        strike: { type: "number" },
-                        price: { type: "number" },
-                        quantity: { type: "number" },
+                        side: { type: "string", enum: ["buy", "sell"], description: "Compra (buy) ou Venda (sell)" },
+                        option_type: { type: "string", enum: ["call", "put", "stock"], description: "Tipo: call, put ou ativo-objeto (stock)" },
+                        asset: { type: "string", description: "Ticker em maiúsculas (ex: PETR4, PETRC405)" },
+                        strike: { type: "number", description: "Preço de exercício (ou preço do ativo para stock)" },
+                        price: { type: "number", description: "Prêmio da opção (ou 0 para stock)" },
+                        quantity: { type: "number", description: "Quantidade (inteiro >= 1)" },
                       },
                       required: ["side", "option_type", "asset", "strike", "price", "quantity"],
                       additionalProperties: false,
@@ -152,7 +258,11 @@ ATENÇÃO ESPECIAL: Linhas sem indicação Call/Put (campo vazio, "-" ou mostran
                   },
                   total_rows_in_image: {
                     type: "number",
-                    description: "Número total de linhas/pernas visíveis na tabela da imagem para dupla verificação",
+                    description: "Número total de linhas/pernas visíveis na tabela da imagem para validação",
+                  },
+                  validation_notes: {
+                    type: "string",
+                    description: "Notas sobre a extração (ex: 'Detectadas 2 pernas: 1 call vendida + 1 ativo comprado')",
                   },
                 },
                 required: ["legs", "total_rows_in_image"],
@@ -185,9 +295,20 @@ ATENÇÃO ESPECIAL: Linhas sem indicação Call/Put (campo vazio, "-" ou mostran
     const toolCallArgs = result.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
     const parsedTool = toolCallArgs ? JSON.parse(toolCallArgs) : null;
 
-    console.log("Extracted legs count:", parsedTool?.legs?.length, "Image rows:", parsedTool?.total_rows_in_image);
+    console.log("OCR Extraction Summary:", {
+      extracted: parsedTool?.legs?.length,
+      imageRows: parsedTool?.total_rows_in_image,
+      notes: parsedTool?.validation_notes,
+    });
 
     const normalized = normalizeLegs(parsedTool?.legs);
+
+    // Validação: se o número de pernas extraídas não corresponde ao número de linhas, log de aviso
+    if (normalized.length !== parsedTool?.total_rows_in_image) {
+      console.warn(
+        `Mismatch: Extracted ${normalized.length} legs but image has ${parsedTool?.total_rows_in_image} rows. Review may be needed.`
+      );
+    }
 
     return new Response(JSON.stringify({ legs: normalized }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

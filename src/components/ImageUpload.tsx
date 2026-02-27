@@ -1,9 +1,10 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Upload, Loader2, X } from 'lucide-react';
+import { Upload, Loader2, X, Zap } from 'lucide-react';
 import { Leg } from '@/lib/types';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 interface ImageUploadProps {
   onLegsExtracted: (legs: Leg[]) => void;
@@ -12,6 +13,7 @@ interface ImageUploadProps {
 export default function ImageUpload({ onLegsExtracted }: ImageUploadProps) {
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
+  const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const processImage = useCallback(async (imageDataUrl: string) => {
@@ -23,13 +25,19 @@ export default function ImageUpload({ onLegsExtracted }: ImageUploadProps) {
       if (error) throw error;
       if (data?.legs && data.legs.length > 0) {
         onLegsExtracted(data.legs);
-        toast.success(`${data.legs.length} perna(s) extraída(s) da imagem!`);
+        toast.success(`✓ ${data.legs.length} perna(s) extraída(s) com sucesso!`, {
+          description: 'Estrutura reconhecida e carregada automaticamente.',
+        });
       } else {
-        toast.error('Não foi possível extrair pernas da imagem. Tente novamente ou insira manualmente.');
+        toast.error('Nenhuma perna detectada', {
+          description: 'Tente outro screenshot ou insira manualmente.',
+        });
       }
     } catch (err: any) {
       console.error('OCR error:', err);
-      toast.error('Erro ao processar imagem: ' + (err.message || 'Tente novamente'));
+      toast.error('Erro ao processar imagem', {
+        description: err.message || 'Tente novamente',
+      });
     } finally {
       setLoading(false);
     }
@@ -37,7 +45,12 @@ export default function ImageUpload({ onLegsExtracted }: ImageUploadProps) {
 
   const handleFile = useCallback((file: File) => {
     if (!file.type.startsWith('image/')) {
-      toast.error('Por favor, envie uma imagem.');
+      toast.error('Formato inválido', { description: 'Por favor, envie uma imagem.' });
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Arquivo muito grande', { description: 'Máximo 10MB.' });
       return;
     }
 
@@ -45,7 +58,7 @@ export default function ImageUpload({ onLegsExtracted }: ImageUploadProps) {
     reader.onload = (e) => {
       const result = e.target?.result as string;
       if (!result?.startsWith('data:image/')) {
-        toast.error('Formato de imagem inválido.');
+        toast.error('Formato inválido', { description: 'Não foi possível ler a imagem.' });
         return;
       }
       setPreview(result);
@@ -85,20 +98,37 @@ export default function ImageUpload({ onLegsExtracted }: ImageUploadProps) {
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    setDragActive(false);
     const file = e.dataTransfer.files[0];
     if (file) handleFile(file);
   }, [handleFile]);
 
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragActive(true);
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    setDragActive(false);
+  }, []);
+
   return (
     <Card
-      className="relative border-2 border-dashed bg-card/60 transition-all hover:border-primary/50 hover:shadow-[0_0_40px_-12px_hsl(var(--primary)/0.35)] cursor-pointer"
+      className={cn(
+        'relative border-2 transition-all duration-300 cursor-pointer group',
+        'bg-gradient-to-br from-primary/5 via-card to-card',
+        dragActive
+          ? 'border-primary/60 shadow-[0_0_40px_-8px_hsl(var(--primary)/0.4)]'
+          : 'border-dashed border-primary/30 hover:border-primary/50 hover:shadow-[0_0_40px_-12px_hsl(var(--primary)/0.35)]'
+      )}
       onPaste={handlePaste}
       onDrop={handleDrop}
-      onDragOver={e => e.preventDefault()}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
       onClick={() => !loading && fileInputRef.current?.click()}
       tabIndex={0}
     >
-      <CardContent className="flex flex-col items-center justify-center py-10 gap-3">
+      <CardContent className="flex flex-col items-center justify-center py-12 gap-4">
         <input
           ref={fileInputRef}
           type="file"
@@ -106,38 +136,58 @@ export default function ImageUpload({ onLegsExtracted }: ImageUploadProps) {
           className="hidden"
           onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])}
         />
-        <div className="text-xs font-semibold uppercase tracking-wide text-primary">Upload OCR (Destaque)</div>
+
         {loading ? (
           <>
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">Analisando imagem com IA...</p>
+            <div className="relative">
+              <div className="absolute inset-0 rounded-full bg-primary/20 blur-xl animate-pulse" />
+              <Loader2 className="h-12 w-12 animate-spin text-primary relative" />
+            </div>
+            <div className="text-center space-y-2">
+              <p className="text-sm font-semibold text-foreground">Analisando com IA...</p>
+              <p className="text-xs text-muted-foreground">Extraindo pernas da operação</p>
+            </div>
           </>
         ) : preview ? (
           <>
-            <div className="relative">
-              <img src={preview} alt="Preview da imagem enviada" className="max-h-32 rounded-lg object-contain" loading="lazy" />
+            <div className="relative group/img">
+              <img 
+                src={preview} 
+                alt="Preview da imagem enviada" 
+                className="max-h-40 rounded-xl object-contain border border-primary/20 shadow-lg" 
+                loading="lazy" 
+              />
               <button
                 type="button"
-                className="absolute -top-2 -right-2 rounded-full bg-destructive p-1 text-destructive-foreground shadow-sm hover:bg-destructive/90"
+                className="absolute -top-3 -right-3 rounded-full bg-destructive p-2 text-destructive-foreground shadow-lg hover:bg-destructive/90 transition-all duration-200 opacity-0 group-hover/img:opacity-100"
                 onClick={(e) => {
                   e.stopPropagation();
                   setPreview(null);
                   if (fileInputRef.current) fileInputRef.current.value = '';
                 }}
               >
-                <X className="h-3 w-3" />
+                <X className="h-4 w-4" />
               </button>
             </div>
-            <p className="text-xs text-muted-foreground">Cole (Ctrl+V), arraste ou clique para substituir</p>
+            <div className="text-center space-y-2">
+              <p className="text-sm font-semibold text-foreground">Imagem carregada</p>
+              <p className="text-xs text-muted-foreground">Ctrl+V, arraste ou clique para trocar</p>
+            </div>
           </>
         ) : (
           <>
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
-              <Upload className="h-6 w-6 text-muted-foreground" />
+            <div className="relative">
+              <div className="absolute inset-0 rounded-2xl bg-primary/10 blur-2xl group-hover:bg-primary/15 transition-colors" />
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 relative">
+                <Zap className="h-8 w-8 text-primary" />
+              </div>
             </div>
-            <div className="text-center">
-              <p className="text-sm font-medium">Arraste, clique ou cole (Ctrl+V)</p>
-              <p className="text-xs text-muted-foreground">Screenshot da sua plataforma de opções</p>
+            <div className="text-center space-y-2">
+              <p className="text-base font-bold text-foreground">Screenshot da Corretora</p>
+              <p className="text-sm text-muted-foreground">Ctrl+V • Arraste • Clique</p>
+              <p className="text-xs text-muted-foreground/60 pt-2">
+                Suporta: PNG, JPG, WebP (máx 10MB)
+              </p>
             </div>
           </>
         )}

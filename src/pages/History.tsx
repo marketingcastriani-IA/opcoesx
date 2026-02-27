@@ -75,6 +75,37 @@ export default function History() {
       
       if (error) throw error;
 
+      // Buscar dados completos da operação para salvar no Portfólio
+      const { data: analysisData } = await supabase
+        .from('analyses')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (analysisData) {
+        // Preparar dados para o Portfólio
+        const portfolioOperation = {
+          id: analysisData.id,
+          name: analysisData.name || 'Operação sem nome',
+          asset: analysisData.underlying_asset || 'N/A',
+          entryDate: new Date(analysisData.created_at).toLocaleDateString('pt-BR'),
+          exitDate: new Date().toLocaleDateString('pt-BR'),
+          profitLoss: 0, // Será preenchido pelo usuário se necessário
+          percentage: 0,
+          strategy: 'Operação encerrada',
+        };
+
+        // Salvar no localStorage do Portfólio
+        try {
+          const saved = localStorage.getItem('portfolio_operations');
+          const portfolioOps = saved ? JSON.parse(saved) : [];
+          const updated = [...portfolioOps, portfolioOperation];
+          localStorage.setItem('portfolio_operations', JSON.stringify(updated));
+        } catch (storageErr) {
+          console.error('Erro ao salvar no localStorage:', storageErr);
+        }
+      }
+
       // Atualizar lista local
       setAnalyses(analyses.map(a => 
         a.id === id ? { ...a, status: 'closed' } : a

@@ -22,6 +22,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Save, Sparkles, Loader2, ArrowRight, Camera, Keyboard } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ProfessionalHeader, SectionDivider } from '@/components/ProfessionalLayout';
+import AIInsights from '@/components/AIInsights';
 
 type InputMode = null | 'manual' | 'image';
 
@@ -137,29 +139,38 @@ export default function Dashboard() {
         )}
 
         {/* Page title */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold">Nova Análise</h1>
+        <ProfessionalHeader
+          title="Nova Análise"
+          subtitle="Monte sua estrutura de opções e analise os riscos em tempo real"
+          badge={
+            <div className="flex gap-2">
               {metrics.strategyLabel && (
-                <Badge variant="outline" className="border-primary/40 text-primary">{metrics.strategyLabel}</Badge>
+                <Badge className="bg-primary/20 text-primary border-primary/30 text-xs font-semibold">{metrics.strategyLabel}</Badge>
               )}
               {metrics.isRiskFree && (
-                <Badge className="bg-success text-success-foreground text-[10px]">RISCO ZERO</Badge>
+                <Badge className="bg-success/20 text-success border-success/30 text-xs font-semibold">RISCO ZERO</Badge>
               )}
             </div>
-            <p className="text-sm text-muted-foreground">Monte sua estrutura de opções e analise os riscos</p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={getAISuggestion} disabled={loadingAI || legs.length === 0} size="sm">
-              {loadingAI ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-              Sugestão IA
-            </Button>
-            <Button onClick={saveAnalysis} disabled={saving || legs.length === 0} size="sm">
-              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              Salvar
-            </Button>
-          </div>
+          }
+        />
+        <div className="flex gap-3 flex-wrap">
+          <Button 
+            onClick={getAISuggestion} 
+            disabled={loadingAI || legs.length === 0} 
+            className="text-base h-11 px-6 shadow-[0_0_30px_-8px_hsl(var(--primary)/0.4)]"
+          >
+            {loadingAI ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Sparkles className="mr-2 h-5 w-5" />}
+            Sugestão IA
+          </Button>
+          <Button 
+            onClick={saveAnalysis} 
+            disabled={saving || legs.length === 0}
+            variant="outline"
+            className="text-base h-11 px-6"
+          >
+            {saving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-5 w-5" />}
+            Salvar Análise
+          </Button>
         </div>
 
         {/* Analysis name */}
@@ -252,13 +263,17 @@ export default function Dashboard() {
               </CardContent>
             </Card>
             <CDIComparison metrics={metrics} cdiRate={cdiRate} setCdiRate={setCdiRate} daysToExpiry={daysToExpiry} setDaysToExpiry={setDaysToExpiry} />
-            {aiSuggestion && (
-              <Card className="border-primary/30 bg-card/50 backdrop-blur-sm">
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Sugestão da IA</CardTitle>
-                </CardHeader>
-                <CardContent><p className="text-sm whitespace-pre-wrap">{aiSuggestion}</p></CardContent>
-              </Card>
+            {legs.length > 0 && (
+              <>
+                <SectionDivider title="Análise de IA" />
+                <AIInsights 
+                  metrics={metrics} 
+                  suggestion={aiSuggestion} 
+                  cdiReturn={cdiReturn}
+                  daysToExpiry={daysToExpiry}
+                  loading={loadingAI}
+                />
+              </>
             )}
           </>
         )}

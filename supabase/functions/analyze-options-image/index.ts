@@ -102,14 +102,17 @@ const normalizeLegs = (legs: RawLeg[] | undefined) => {
       let price = priceRaw;
 
       if (optionType === "stock") {
-        // Para ativo-objeto: strike é o preço de compra/venda, price é 0
-        strike = strikeRaw > 0 ? strikeRaw : priceRaw;
-        price = 0;
+        // Para ativo-objeto: aceita preço em qualquer campo (strike ou price)
+        // Prioriza o campo que tem valor > 0
+        const validStrike = strikeRaw > 0 ? strikeRaw : priceRaw;
         
-        if (strike <= 0) {
-          console.warn(`Leg ${idx}: Preço do ativo inválido (${strikeRaw}, ${priceRaw})`);
+        if (validStrike <= 0) {
+          console.warn(`Leg ${idx}: Preço do ativo inválido (strike: ${strikeRaw}, price: ${priceRaw})`);
           return null;
         }
+        
+        strike = validStrike;
+        price = 0; // Sempre 0 para ativo-objeto
       } else {
         // Para opções: strike é o preço de exercício, price é o prêmio
         if (strike <= 0) {
@@ -199,11 +202,13 @@ REGRAS CRÍTICAS DE EXTRAÇÃO:
 
 4. **STRIKE (Preço de Exercício)**:
    - Para opções: preço de exercício como número decimal (ex: 39.65, 30.00)
-   - Para ativos (stock): use o preço unitário de compra/venda do ativo
+   - Para ativos (stock): use o preço unitário de compra/venda do ativo (ex: 39.61)
+   - CRÍTICO: Não deixe em branco ou zero para ativos!
 
 5. **PRICE (Prêmio/Preço)**:
    - Para opções: prêmio como número decimal (ex: 0.80, 1.50)
    - Para ativos (stock): use 0 (zero)
+   - CRÍTICO: Se o preço do ativo está no campo "Preço" em vez de "Strike", coloque no campo "price" (o sistema saberá reconhecer)
 
 6. **QUANTITY (Quantidade)**:
    - Número inteiro >= 1
@@ -218,6 +223,11 @@ DUPLA VERIFICAÇÃO OBRIGATÓRIA:
 EXEMPLO DE ESTRUTURA CORRETA (Compra Coberta):
 Linha 1: side=sell, option_type=call, asset=PETRC405, strike=39.65, price=0.80, quantity=100
 Linha 2: side=buy, option_type=stock, asset=PETR4, strike=39.61, price=0, quantity=100
+(Nota: O preço do ativo (39.61) está em STRIKE, e PRICE é 0)
+
+ALTERNATIVA ACEITA (se OCR coloca preço em "price"):
+Linha 2: side=buy, option_type=stock, asset=PETR4, strike=0, price=39.61, quantity=100
+(O sistema saberá reconhecer e usar o valor correto)
 
 EXEMPLO DE ESTRUTURA CORRETA (Trava de Alta):
 Linha 1: side=buy, option_type=call, asset=PETRD30, strike=30.00, price=1.50, quantity=100
@@ -226,7 +236,7 @@ Linha 2: side=sell, option_type=call, asset=PETRD32, strike=32.00, price=0.50, q
           {
             role: "user",
             content: [
-              { type: "text", text: "Extraia TODAS as pernas da operação desta imagem com máxima precisão. Cada linha da tabela é uma perna. Não omita nenhuma. Valide que o número total de pernas extraídas corresponde ao número de linhas visíveis na tabela." },
+              { type: "text", text: "Extraia TODAS as pernas da operação desta imagem com máxima precisão. Cada linha da tabela é uma perna. Não omita nenhuma. Valide que o número total de pernas extraídas corresponde ao número de linhas visíveis na tabela. CRÍTICO: Para ativos (stock), certifique-se de extrair o preço corretamente, mesmo que esteja em campos diferentes." },
               { type: "image_url", image_url: { url: resolvedImage } },
             ],
           },

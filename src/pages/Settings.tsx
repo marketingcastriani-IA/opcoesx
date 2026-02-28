@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Loader2, Lock, Mail, LogOut, Shield } from 'lucide-react';
+import { Loader2, Lock, Mail, LogOut, Shield, Database, Copy, Check } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 
 export default function Settings() {
   const { user, loading: authLoading, signOut } = useAuth();
@@ -16,6 +17,170 @@ export default function Settings() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [sqlCopied, setSqlCopied] = useState(false);
+
+  const schemaSQL = `-- ============================
+-- OpçõesX - Schema SQL Completo
+-- ============================
+
+-- Enum de roles
+CREATE TYPE public.app_role AS ENUM ('admin', 'user');
+
+-- Tabela: analyses
+CREATE TABLE public.analyses (
+  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL,
+  name TEXT NOT NULL DEFAULT 'Análise sem nome',
+  underlying_asset TEXT,
+  cdi_rate NUMERIC,
+  days_to_expiry INTEGER,
+  ai_suggestion TEXT,
+  status TEXT NOT NULL DEFAULT 'active',
+  closed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.analyses ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own analyses" ON public.analyses FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own analyses" ON public.analyses FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own analyses" ON public.analyses FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own analyses" ON public.analyses FOR DELETE USING (auth.uid() = user_id);
+
+-- Tabela: legs
+CREATE TABLE public.legs (
+  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  analysis_id UUID NOT NULL REFERENCES public.analyses(id),
+  side TEXT NOT NULL,
+  option_type TEXT NOT NULL,
+  asset TEXT NOT NULL,
+  strike NUMERIC NOT NULL,
+  price NUMERIC NOT NULL,
+  quantity INTEGER NOT NULL DEFAULT 1,
+  current_price NUMERIC,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.legs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view legs of own analyses" ON public.legs FOR SELECT
+  USING (EXISTS (SELECT 1 FROM analyses WHERE analyses.id = legs.analysis_id AND analyses.user_id = auth.uid()));
+CREATE POLICY "Users can insert legs to own analyses" ON public.legs FOR INSERT
+  WITH CHECK (EXISTS (SELECT 1 FROM analyses WHERE analyses.id = legs.analysis_id AND analyses.user_id = auth.uid()));
+CREATE POLICY "Users can update legs of own analyses" ON public.legs FOR UPDATE
+  USING (EXISTS (SELECT 1 FROM analyses WHERE analyses.id = legs.analysis_id AND analyses.user_id = auth.uid()));
+CREATE POLICY "Users can delete legs of own analyses" ON public.legs FOR DELETE
+  USING (EXISTS (SELECT 1 FROM analyses WHERE analyses.id = legs.analysis_id AND analyses.user_id = auth.uid()));
+
+-- Tabela: profiles
+CREATE TABLE public.profiles (
+  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL,
+  display_name TEXT,
+  theme_preference TEXT NOT NULL DEFAULT 'dark',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own profile" ON public.profiles FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own profile" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = user_id);
+
+-- Tabela: user_access
+CREATE TABLE public.user_access (
+  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  trial_days INTEGER NOT NULL DEFAULT 0,
+  approved_at TIMESTAMPTZ,
+  expires_at TIMESTAMPTZ,
+  notes TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.user_access ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own access" ON public.user_access FOR SELECT
+  USING ((auth.uid() = user_id) OR has_role(auth.uid(), 'admin'));
+CREATE POLICY "Admins can insert access" ON public.user_access FOR INSERT
+  WITH CHECK (has_role(auth.uid(), 'admin') OR (auth.uid() = user_id));
+CREATE POLICY "Admins can update access" ON public.user_access FOR UPDATE
+  USING (has_role(auth.uid(), 'admin'));
+CREATE POLICY "Admins can delete access" ON public.user_access FOR DELETE
+  USING (has_role(auth.uid(), 'admin'));
+
+-- Tabela: user_roles
+CREATE TABLE public.user_roles (
+  id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID NOT NULL,
+  role app_role NOT NULL DEFAULT 'user',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Admins can view all roles" ON public.user_roles FOR SELECT
+  USING (has_role(auth.uid(), 'admin') OR (auth.uid() = user_id));
+CREATE POLICY "Only admins can insert roles" ON public.user_roles FOR INSERT
+  WITH CHECK (has_role(auth.uid(), 'admin'));
+CREATE POLICY "Only admins can update roles" ON public.user_roles FOR UPDATE
+  USING (has_role(auth.uid(), 'admin'));
+CREATE POLICY "Only admins can delete roles" ON public.user_roles FOR DELETE
+  USING (has_role(auth.uid(), 'admin'));
+
+-- Funções
+CREATE OR REPLACE FUNCTION public.has_role(_user_id UUID, _role app_role)
+RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public' AS $$
+  SELECT EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = _user_id AND role = _role)
+$$;
+
+CREATE OR REPLACE FUNCTION public.has_active_access(_user_id UUID)
+RETURNS BOOLEAN LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public' AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_access
+    WHERE user_id = _user_id AND status = 'approved' AND (expires_at IS NULL OR expires_at > now())
+  ) OR public.has_role(_user_id, 'admin')
+$$;
+
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$
+BEGIN
+  INSERT INTO public.profiles (user_id, display_name)
+  VALUES (NEW.id, COALESCE(NEW.raw_user_meta_data->>'display_name', NEW.email));
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.handle_new_user_access()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public' AS $$
+BEGIN
+  INSERT INTO public.user_access (user_id, status) VALUES (NEW.id, 'pending');
+  RETURN NEW;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.update_updated_at_column()
+RETURNS TRIGGER LANGUAGE plpgsql SET search_path TO 'public' AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$;`;
+
+  const handleCopySQL = async () => {
+    try {
+      await navigator.clipboard.writeText(schemaSQL);
+      setSqlCopied(true);
+      toast.success('SQL copiado para a área de transferência!');
+      setTimeout(() => setSqlCopied(false), 2000);
+    } catch {
+      toast.error('Erro ao copiar SQL');
+    }
+  };
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,6 +330,40 @@ export default function Settings() {
                 )}
               </Button>
             </form>
+          </CardContent>
+        </Card>
+
+        {/* SQL Schema */}
+        <Card className="border-2 border-info/30 bg-gradient-to-br from-info/[0.08] to-card">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Database className="h-5 w-5 text-info" />
+                SQL das Tabelas
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleCopySQL}
+                className="border-info/30 hover:bg-info/10"
+              >
+                {sqlCopied ? (
+                  <><Check className="mr-1 h-4 w-4 text-success" /> Copiado!</>
+                ) : (
+                  <><Copy className="mr-1 h-4 w-4" /> Copiar SQL</>
+                )}
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Textarea
+              readOnly
+              value={schemaSQL}
+              className="font-mono text-xs leading-relaxed h-80 resize-y bg-muted/30 border-muted-foreground/20"
+            />
+            <p className="mt-2 text-xs text-muted-foreground">
+              Use este SQL para recriar todas as tabelas, políticas RLS e funções em outro projeto.
+            </p>
           </CardContent>
         </Card>
 
